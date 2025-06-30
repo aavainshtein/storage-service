@@ -39,6 +39,30 @@ services:
     volumes:
       - minio_data:/data
 
+  # Новый сервис для нашего бэкенда
+  storage:
+    build:
+      context: ./backend # Путь к вашему NestJS проекту
+      dockerfile: Dockerfile # Имя файла Dockerfile внутри папки backend
+    restart: always
+    depends_on:
+      - postgres
+      - hasura
+      - minio
+    environment:
+      # Переменные окружения для NestJS бэкенда (мы их добавим в Dockerfile и .env позже)
+      NODE_ENV: development
+      PORT: 8000
+      HASURA_ENDPOINT: http://hasura:8080/v1/graphql
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET}
+      MINIO_ENDPOINT: minio:9000 # Внутри docker-сети используем имя сервиса
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME} # constante-storage
+      STORAGE_PUBLIC_URL: http://localhost:8000 # Публичный URL для генерации ссылок
+    ports:
+      - "8000:8000" # Пробрасываем порт бэкенда
+
 volumes:
   postgres_data:
   minio_data:
