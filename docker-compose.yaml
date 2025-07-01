@@ -45,6 +45,12 @@ services:
       context: ./backend # Путь к вашему NestJS проекту
       dockerfile: Dockerfile # Имя файла Dockerfile внутри папки backend
     restart: always
+    volumes:
+      - ./backend:/app # <-- ДОБАВЛЕНО/ИЗМЕНЕНО
+      - /app/node_modules # <-- ДОБАВЛЕНО: Важно для Node.js проектов!
+    # command: npm run start:dev # <-- Может потребоваться изменить команду запуска
+    command: npm run start:debug # <-- Это позволит NestJS перезагружаться при изменениях
+
     depends_on:
       - postgres
       - hasura
