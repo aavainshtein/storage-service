@@ -22,6 +22,8 @@ import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 import { Multer } from 'multer';
+
+@Controller('storage')
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
   private readonly bucketName: string;
@@ -53,6 +55,7 @@ export class FilesController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file')) // 'file' - это имя поля в форме, которое содержит файл
   async uploadFile(@UploadedFile() file: Multer.File) {
+    console.log('upload endpoint called');
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
