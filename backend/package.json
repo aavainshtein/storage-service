@@ -25,7 +25,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "graphql": "^16.11.0",
-    "graphql-request": "^7.2.0",
+    "graphql-request": "6.1.0",
     "minio": "^8.0.5",
     "multer": "^2.0.1",
     "reflect-metadata": "^0.2.2",
