@@ -16,16 +16,37 @@ export class MinioService {
 
   constructor(private configService: ConfigService) {
     const endPoint = this.configService.get<string>('MINIO_ENDPOINT');
-    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY');
-    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY');
+    const accessKey = this.configService.get<string>('MINIO_ROOT_USER');
+    const secretKey = this.configService.get<string>('MINIO_ROOT_PASSWORD');
+
+    // console.log('configService:', this.configService.get('MINIO_ROOT_USER'));
+
     this.bucketName =
       this.configService.get<string>('MINIO_BUCKET_NAME') || 'default-bucket';
 
-    if (!endPoint || !accessKey || !secretKey || !this.bucketName) {
-      this.logger.error(
-        'MinIO configuration is missing environment variables.',
+    if (!endPoint) {
+      this.logger.error('MinIO configuration is missing MINIO_ENDPOINT.');
+      throw new InternalServerErrorException(
+        'MinIO configuration error: MINIO_ENDPOINT',
       );
-      throw new InternalServerErrorException('MinIO configuration error');
+    }
+    if (!accessKey) {
+      this.logger.error('MinIO configuration is missing MINIO_ROOT_USER.');
+      throw new InternalServerErrorException(
+        'MinIO configuration error: MINIO_ROOT_USER',
+      );
+    }
+    if (!secretKey) {
+      this.logger.error('MinIO configuration is missing MINIO_ROOT_PASSWORD.');
+      throw new InternalServerErrorException(
+        'MinIO configuration error: MINIO_ROOT_PASSWORD',
+      );
+    }
+    if (!this.bucketName) {
+      this.logger.error('MinIO configuration is missing MINIO_BUCKET_NAME.');
+      throw new InternalServerErrorException(
+        'MinIO configuration error: MINIO_BUCKET_NAME',
+      );
     }
 
     const [host, port] = endPoint.split(':');
