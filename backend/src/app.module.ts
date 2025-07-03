@@ -10,7 +10,9 @@ import { FilesModule } from './files/files.module'; // Импортируем Fi
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '../.env',
+      // envFilePath: '../../.env',
+      envFilePath:
+        process.env.NODE_ENV === 'development' ? '.env' : '../../.env',
     }),
     MinioModule,
     FilesModule, // Добавляем FilesModule
