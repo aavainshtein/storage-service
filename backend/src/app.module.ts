@@ -11,7 +11,9 @@ import { ArticlesModule } from './articles/articles.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '../.env',
+      // envFilePath: '../../.env',
+      envFilePath:
+        process.env.NODE_ENV === 'development' ? '.env' : '../../.env',
     }),
     MinioModule,
     FilesModule,
