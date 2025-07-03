@@ -12,8 +12,8 @@ describe('MinioService', () => {
     get: jest.fn((key: string) => {
       const config = {
         MINIO_ENDPOINT: 'localhost:9000',
-        MINIO_ROOT_USER: 'minioadmin',
-        MINIO_ROOT_PASSWORD: 'minioadminpassword',
+        MINIO_ACCESS_KEY: 'minioadmin',
+        MINIO_SECRET_KEY: 'minioadminpassword',
         MINIO_BUCKET_NAME: 'constante-storage',
       };
       return config[key];
