@@ -18,20 +18,18 @@ describe('ArticlesService', () => {
     expect(service).toBeDefined();
   });
 
-  // --- Наш первый тест для TDD (Красный) ---
   it('should create an article', () => {
     const newArticle: Article = {
-      id: '', // ID будет сгенерирован сервисом
+      id: '',
       title: 'Test Title',
       content: 'Test Content',
       author: 'Test Author',
     };
     const createdArticle = service.create(newArticle);
-    // console.log('Created Article:', createdArticle); // Выводим созданную статью в консоль
+
     expect(createdArticle).toBeDefined();
-    expect(createdArticle.id).toBeDefined(); // Ожидаем, что ID будет сгенерирован
+    expect(createdArticle.id).toBeDefined();
     expect(createdArticle.title).toEqual('Test Title');
     expect(createdArticle.content).toEqual('Test Content');
   });
-  // --- Конец первого теста ---
 });
