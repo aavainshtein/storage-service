@@ -27,7 +27,7 @@ describe('ArticlesService', () => {
       author: 'Test Author',
     };
     const createdArticle = service.create(newArticle);
-    console.log('Created Article:', createdArticle); // Выводим созданную статью в консоль
+    // console.log('Created Article:', createdArticle); // Выводим созданную статью в консоль
     expect(createdArticle).toBeDefined();
     expect(createdArticle.id).toBeDefined(); // Ожидаем, что ID будет сгенерирован
     expect(createdArticle.title).toEqual('Test Title');

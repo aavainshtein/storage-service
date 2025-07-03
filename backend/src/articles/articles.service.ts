@@ -8,9 +8,9 @@ export class ArticlesService {
   // Создать новую статью
   create(article: Article): Article {
     article.id = Date.now().toString(); // Генерируем простой ID
-    const articleBuffer = { ...article };
-    articleBuffer.title = 'Untitled Article'; // Устанавливаем заголовок по умолчанию, если не указан
-    this.articles.push(articleBuffer);
-    return articleBuffer;
+    // const articleBuffer = { ...article };
+    // articleBuffer.title = 'Untitled Article'; // Устанавливаем заголовок по умолчанию, если не указан
+    this.articles.push(article);
+    return article;
   }
 }
