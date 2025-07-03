@@ -16,8 +16,8 @@ export class MinioService {
 
   constructor(private configService: ConfigService) {
     const endPoint = this.configService.get<string>('MINIO_ENDPOINT');
-    const accessKey = this.configService.get<string>('MINIO_ROOT_USER');
-    const secretKey = this.configService.get<string>('MINIO_ROOT_PASSWORD');
+    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY');
+    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY');
 
     // console.log('configService:', this.configService.get('MINIO_ROOT_USER'));
 
@@ -31,15 +31,15 @@ export class MinioService {
       );
     }
     if (!accessKey) {
-      this.logger.error('MinIO configuration is missing MINIO_ROOT_USER.');
+      this.logger.error('MinIO configuration is missing MINIO_ACCESS_KEY.');
       throw new InternalServerErrorException(
-        'MinIO configuration error: MINIO_ROOT_USER',
+        'MinIO configuration error: MINIO_ACCESS_KEY.',
       );
     }
     if (!secretKey) {
-      this.logger.error('MinIO configuration is missing MINIO_ROOT_PASSWORD.');
+      this.logger.error('MinIO configuration is missing MINIO_SECRET_KEY.');
       throw new InternalServerErrorException(
-        'MinIO configuration error: MINIO_ROOT_PASSWORD',
+        'MinIO configuration error: MINIO_SECRET_KEY.',
       );
     }
     if (!this.bucketName) {
