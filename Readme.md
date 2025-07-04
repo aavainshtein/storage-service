@@ -5,7 +5,7 @@
 
 ## Project Overview
 
-This project is a comprehensive self-hosted file management solution, consisting of two key components:
+This project is a self-hosted file management solution, consisting of two key components:
 
 1. **Backend service in TypeScript (NestJS):** The central hub that handles all file operations. It interacts with **MinIO** for actual file storage, **PostgreSQL** for file metadata, and **Hasura GraphQL Engine** for role-based permission checks.
 2. **Client-side JavaScript/TypeScript library (SDK):** An interface for frontend applications, providing convenient methods for interacting with the backend service (uploading, downloading, deleting files, and managing URLs).
