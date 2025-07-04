@@ -6,22 +6,17 @@ import { Readable } from 'stream';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Попробуем загрузить из корня проекта
 const envPath = path.resolve(__dirname, '../../../.env');
-console.log('Trying to load from:', envPath);
 const result = dotenv.config({ path: envPath });
-console.log('dotenv result:', result);
 
 describe('MinioService Integration Tests', () => {
   let service: MinioService;
   let configService: ConfigService;
 
   beforeAll(async () => {
-    // Настройка модуля БЕЗ моков
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
-          // envFilePath: '../../../.env',
           isGlobal: true,
         }),
       ],
