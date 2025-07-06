@@ -14,7 +14,9 @@ export class FilesService {
   private readonly logger = new Logger(FilesService.name);
 
   constructor(private configService: ConfigService) {
-    const hasuraEndpoint = this.configService.get<string>('HASURA_ENDPOINT');
+    const hasuraEndpoint = this.configService.get<string>(
+      'HASURA_GRAPHQL_ENDPOINT',
+    );
     const hasuraAdminSecret = this.configService.get<string>(
       'HASURA_GRAPHQL_ADMIN_SECRET',
     );
