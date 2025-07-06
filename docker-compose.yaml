@@ -61,7 +61,7 @@ services:
       # Переменные окружения для NestJS бэкенда (мы их добавим в Dockerfile и .env позже)
       NODE_ENV: development
       PORT: 8000
-      HASURA_ENDPOINT: http://hasura:8080/v1/graphql
+      HASURA_GRAPHQL_ENDPOINT: http://hasura:8080/v1/graphql
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET}
       MINIO_ENDPOINT: minio:9000 # Внутри docker-сети используем имя сервиса
 
