@@ -56,8 +56,8 @@ export class FilesService {
       requestHeaders['x-hasura-allowed-roles'] = roles.join(','); // Все разрешенные роли
     } else {
       // Если пользователь не аутентифицирован (аноним), явно указываем роль 'anonymous'
-      requestHeaders['x-hasura-role'] = 'anonymous';
-      requestHeaders['x-hasura-allowed-roles'] = 'anonymous';
+      requestHeaders['x-hasura-role'] = 'user';
+      requestHeaders['x-hasura-allowed-roles'] = 'user';
     }
 
     try {
@@ -93,7 +93,7 @@ export class FilesService {
     mimeType: string,
     etag: string,
     uploadedByUserId: string | undefined, // Может быть undefined для анонимных
-    roles: string[],
+    roles?: string[],
   ): Promise<{ id: string }> {
     const fileId = uuidv4();
 
@@ -138,7 +138,7 @@ export class FilesService {
   async deleteFileMetadata(
     fileId: string,
     userId: string,
-    roles: string[],
+    roles?: string[],
   ): Promise<{ id: string }> {
     const mutation = gql`
       mutation DeleteFile($id: uuid!) {
