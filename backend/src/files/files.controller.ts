@@ -14,16 +14,25 @@ import {
   BadRequestException,
   Header,
   Query,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { Request as ExpressRequest } from 'express';
 import { MinioService } from '../minio/minio.service';
 import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 import { Multer } from 'multer';
+import { AuthGuard } from '../auth/auth/auth.guard';
+
+interface RequestWithHasuraUserId extends ExpressRequest {
+  hasuraUserId?: string;
+}
 
 @Controller('storage')
+@UseGuards(AuthGuard)
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
   private readonly bucketName: string;
@@ -53,12 +62,17 @@ export class FilesController {
   }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file')) // 'file' - это имя поля в форме, которое содержит файл
-  async uploadFile(@UploadedFile() file: Multer.File) {
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile() file: Multer.File,
+    @Req() req: RequestWithHasuraUserId,
+  ) {
     console.log('upload endpoint called');
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
+
+    const uploadedByUserId = req.hasuraUserId; // Может быть undefined, если пользователь анонимный
 
     const objectName = `${file.originalname}`; // Имя файла в MinIO, можно использовать UUID
 
@@ -107,7 +121,7 @@ export class FilesController {
         file.size,
         file.mimetype,
         uploadedInfo.etag,
-        // uploadedByUserId: 'some-user-id' // TODO: Добавить реальный ID пользователя из токена аутентификации
+        uploadedByUserId,
       );
 
       const publicUrl = `${this.storagePublicUrl}/storage/download/${fileMetadata.id}`; // URL для скачивания через наш сервис
