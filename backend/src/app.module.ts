@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { MinioModule } from './minio/minio.module';
 import { ConfigModule } from '@nestjs/config';
 import { FilesModule } from './files/files.module'; // Импортируем FilesModule
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { FilesModule } from './files/files.module'; // Импортируем Fi
         process.env.NODE_ENV === 'development' ? '.env' : '../../.env',
     }),
     MinioModule,
-    FilesModule, // Добавляем FilesModule
+    FilesModule,
+    AuthModule, // Добавляем FilesModule
   ],
   controllers: [AppController],
   providers: [AppService],
