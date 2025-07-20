@@ -49,7 +49,7 @@ services:
     restart: always
     volumes:
       - ./backend:/app # <-- ДОБАВЛЕНО/ИЗМЕНЕНО
-      - /app/node_modules # <-- ДОБАВЛЕНО: Важно для Node.js проектов!
+      # - /app/node_modules # <-- ДОБАВЛЕНО: Важно для Node.js проектов!
     # command: npm run start:dev # <-- Может потребоваться изменить команду запуска
     command: npm run start:debug # <-- Это позволит NestJS перезагружаться при изменениях
 
@@ -69,6 +69,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME} # constante-storage
       STORAGE_PUBLIC_URL: http://localhost:8000 # Публичный URL для генерации ссылок
+
+      BETTER_AUTH_API_URL: ${BETTER_AUTH_API_URL} # URL BetterAuth API
     ports:
       - "8000:8000" # Пробрасываем порт бэкенда
 
