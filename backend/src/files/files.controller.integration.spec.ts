@@ -17,6 +17,7 @@ console.log('Environment variables loaded:', result.parsed);
 
 describe('FilesController Integration tests', () => {
   let app: INestApplication;
+  let fileId: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -64,8 +65,60 @@ describe('FilesController Integration tests', () => {
       .attach('file', filePath)
       .expect(201)
       .then((response) => {
+        console.log('File upload response:', response.body);
+        fileId = response.body.fileId; // Сохраняем ID файла для последующих тестов
         expect(response.body).toHaveProperty('fileName');
         expect(response.body.fileName).toMatch('testFile.txt');
+      });
+  });
+
+  it('Should get presigned url successfully', async () => {
+    if (!fileId) {
+      throw new Error('File ID is not defined. Cannot get presigned URL.');
+    }
+    return request(app.getHttpServer())
+      .get(`/storage/presigned-url/${fileId}`)
+      .expect(200)
+      .then((response) => {
+        console.log('Presigned URL response:', response.body);
+        expect(response.body).toHaveProperty('url');
+      });
+  });
+
+  it('Should download a file successfully', async () => {
+    if (!fileId) {
+      throw new Error('File ID is not defined. Cannot download file.');
+    }
+    return request(app.getHttpServer())
+      .get(`/storage/download/${fileId}`)
+      .buffer(true)
+      .parse((res, callback) => {
+        // Собираем все чанки в буфер
+        const data: Buffer[] = [];
+        res.on('data', (chunk) => data.push(chunk));
+        res.on('end', () => callback(null, Buffer.concat(data)));
+      })
+      .expect(200)
+      .expect('Content-Disposition', /attachment; filename="testFile.txt"/)
+      .then((response) => {
+        expect(Buffer.isBuffer(response.body)).toBe(true);
+        expect(response.body.length).toBeGreaterThan(0);
+      });
+  });
+
+  it('Should delete a file successfully', async () => {
+    if (!fileId) {
+      throw new Error('File ID is not defined. Cannot delete file.');
+    }
+    return request(app.getHttpServer())
+      .delete(`/storage/${fileId}`)
+      .expect(200)
+      .then((response) => {
+        console.log('File deletion response:', response.body);
+        expect(response.body).toHaveProperty(
+          'message',
+          'File deleted successfully',
+        );
       });
   });
 });
