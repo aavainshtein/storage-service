@@ -12,6 +12,7 @@ import {
   NotFoundException,
   Logger,
   BadRequestException,
+  ForbiddenException,
   Header,
   Query,
   UseGuards,
@@ -29,6 +30,7 @@ import { AuthGuard } from '../auth/auth/auth.guard';
 
 interface RequestWithHasuraUserId extends ExpressRequest {
   hasuraUserId?: string;
+  hasuraRoles?: string[];
 }
 
 @Controller('storage')
@@ -73,6 +75,7 @@ export class FilesController {
     }
 
     const uploadedByUserId = req.hasuraUserId; // Может быть undefined, если пользователь анонимный
+    const roles = req.hasuraRoles;
 
     const objectName = `${file.originalname}`; // Имя файла в MinIO, можно использовать UUID
 
@@ -80,6 +83,8 @@ export class FilesController {
       // Проверяем бакет и его настройки (размер, тип)
       const bucketMetadata = await this.filesService.getBucketByName(
         this.bucketName,
+        uploadedByUserId,
+        roles,
       );
       if (!bucketMetadata) {
         throw new InternalServerErrorException(
@@ -122,6 +127,7 @@ export class FilesController {
         file.mimetype,
         uploadedInfo.etag,
         uploadedByUserId,
+        roles,
       );
 
       const publicUrl = `${this.storagePublicUrl}/storage/download/${fileMetadata.id}`; // URL для скачивания через наш сервис
@@ -153,9 +159,20 @@ export class FilesController {
 
   @Get('download/:fileId')
   @Header('Content-Type', 'application/octet-stream') // Заголовок по умолчанию, будет переопределен
-  async downloadFile(@Param('fileId') fileId: string, @Res() res: Response) {
+  async downloadFile(
+    @Param('fileId') fileId: string,
+    @Res() res: Response,
+    @Req() req: RequestWithHasuraUserId,
+  ) {
+    const userId = req.hasuraUserId;
+    const roles = req.hasuraRoles;
+
     try {
-      const fileMetadata = await this.filesService.getFileMetadata(fileId);
+      const fileMetadata = await this.filesService.getFileMetadata(
+        fileId,
+        userId,
+        roles,
+      );
       if (!fileMetadata) {
         throw new NotFoundException(`File with ID ${fileId} not found.`);
       }
@@ -184,17 +201,38 @@ export class FilesController {
   }
 
   @Delete(':fileId')
-  async deleteFile(@Param('fileId') fileId: string) {
-    try {
-      const fileMetadata = await this.filesService.getFileMetadata(fileId);
-      if (!fileMetadata) {
-        throw new NotFoundException(`File with ID ${fileId} not found.`);
-      }
+  async deleteFile(
+    @Param('fileId') fileId: string,
+    @Res() res: Response,
+    @Req() req: RequestWithHasuraUserId,
+  ) {
+    const userId = req.hasuraUserId;
+    const roles = req.hasuraRoles;
 
-      const objectName = fileMetadata.name; // Имя файла в MinIO
+    if (!userId) {
+      // Запрещаем удаление анонимным пользователям
+      throw new ForbiddenException('Authentication required to delete files.');
+    }
+
+    try {
+      // Сначала проверяем, имеет ли пользователь доступ к файлу через Hasura
+      // Здесь GetFileMetadata может выбросить Forbidden/NotFound если Hasura не дает доступ
+      const fileMetadata = await this.filesService.getFileMetadata(
+        fileId,
+        userId,
+        roles,
+      );
+      if (!fileMetadata) {
+        throw new NotFoundException(
+          `File with ID ${fileId} not found or not accessible.`,
+        );
+      }
+      // Теперь, когда мы знаем, что пользователь имеет доступ к метаданным,
+      // Hasura также проверит разрешение на удаление при вызове deleteFileMetadata
+      const objectName = fileMetadata.name;
 
       await this.minioService.deleteFile(objectName);
-      await this.filesService.deleteFileMetadata(fileId);
+      await this.filesService.deleteFileMetadata(fileId, userId, roles); // Передаем userId и roles
 
       return { message: 'File deleted successfully', fileId };
     } catch (error) {
@@ -213,19 +251,33 @@ export class FilesController {
   async getPresignedUrl(
     @Param('fileId') fileId: string,
     @Query('expiry') expiry: string,
+    @Req() req: RequestWithHasuraUserId,
   ) {
+    const userId = req.hasuraUserId;
+    const roles = req.hasuraRoles;
+
     try {
-      const fileMetadata = await this.filesService.getFileMetadata(fileId);
+      // Здесь Hasura проверит, имеет ли пользователь доступ к метаданным файла fileId
+      const fileMetadata = await this.filesService.getFileMetadata(
+        fileId,
+        userId,
+        roles,
+      );
       if (!fileMetadata) {
-        throw new NotFoundException(`File with ID ${fileId} not found.`);
+        throw new NotFoundException(
+          `File with ID ${fileId} not found or not accessible.`,
+        );
       }
 
+      // Здесь GetBucketByName также будет использовать заголовки пользователя
       const bucketMetadata = await this.filesService.getBucketByName(
         this.bucketName,
+        userId,
+        roles,
       );
       if (!bucketMetadata || !bucketMetadata.presigned_urls_enabled) {
         throw new BadRequestException(
-          `Presigned URLs are not enabled for bucket '${this.bucketName}'.`,
+          `Presigned URLs are not enabled for bucket '${this.bucketName}' or bucket not accessible.`,
         );
       }
 
