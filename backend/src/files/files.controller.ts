@@ -77,7 +77,7 @@ export class FilesController {
     const uploadedByUserId = req.hasuraUserId; // Может быть undefined, если пользователь анонимный
     const roles = req.hasuraRoles;
 
-    const objectName = `${file.originalname}`; // Имя файла в MinIO, можно использовать UUID
+    // const objectName = `${file.originalname}`; // Имя файла в MinIO, можно использовать UUID
 
     try {
       // Проверяем бакет и его настройки (размер, тип)
@@ -111,36 +111,52 @@ export class FilesController {
         );
       }
 
-      const fileStream = Readable.from(file.buffer);
-      const uploadedInfo = await this.minioService.uploadFile(
-        objectName,
-        fileStream,
-        file.size,
-        { 'Content-Type': file.mimetype },
-      );
-
-      // Сохраняем метаданные файла в Hasura
-      const fileMetadata = await this.filesService.createFileMetadata(
-        file.originalname, // Используем оригинальное имя файла
-        bucketMetadata.id, // ID бакета из Hasura
-        file.size,
-        file.mimetype,
-        uploadedInfo.etag,
-        uploadedByUserId,
-        roles,
-      );
-
-      const publicUrl = `${this.storagePublicUrl}/storage/download/${fileMetadata.id}`; // URL для скачивания через наш сервис
-
-      this.logger.log(`File uploaded and metadata saved: ${fileMetadata.id}`);
-      return {
-        message: 'File uploaded successfully',
-        fileId: fileMetadata.id,
-        fileName: file.originalname,
+      // Сохраняем метаданные файла в Hasura которые обновим после успешной загрузки
+      const fileMetadata = await this.filesService.createFileMetadata({
+        name: file.originalname, // Используем оригинальное имя файла
+        bucketId: bucketMetadata.id, // ID бакета из Hasura
         size: file.size,
         mimeType: file.mimetype,
+        uploadedByUserId: uploadedByUserId,
+        isUploaded: false, // Устанавливаем false, пока файл не загружен
+        roles,
+      });
+
+      if (!!fileMetadata?.id) {
+        this.logger.log(`File metadata created with ID: ${fileMetadata.id}`);
+      }
+
+      const fileStream = Readable.from(file.buffer);
+      const uploadedInfo = await this.minioService.uploadFile(
+        fileMetadata.id, // Используем ID метаданных как имя объекта
+        fileStream,
+        file.size,
+        { 'Content-Type': file.mimetype, name: file.originalname },
+      );
+
+      if (!uploadedInfo) {
+        throw new InternalServerErrorException(
+          'Failed to upload file to MinIO.',
+        );
+      }
+
+      // Обновляем метаданные файла после успешной загрузки
+      const updatedFileMetadata = await this.filesService.updateFileMetadata({
+        id: fileMetadata.id,
         etag: uploadedInfo.etag,
-        url: publicUrl,
+        mimeType: file.mimetype,
+        name: file.originalname,
+        size: file.size,
+        isUploaded: true, // Устанавливаем true, так как файл успешно загружен
+      });
+
+      this.logger.log(
+        `File uploaded and metadata saved: ${JSON.stringify(updatedFileMetadata)}`,
+      );
+      return {
+        message: 'File uploaded successfully',
+        ...{ updatedFileMetadata },
+        // url: publicUrl,
       };
     } catch (error) {
       this.logger.error(
