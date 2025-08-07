@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS storage.files (
     name TEXT NOT NULL,
     bucket_id UUID NOT NULL REFERENCES storage.buckets(id) ON DELETE CASCADE,
     size BIGINT NOT NULL,
-    mime_type TEXT NOT NULL,
+    mime_type TEXT ,
     etag TEXT,
-    uploaded_by_user_id TEXT, -- Используем TEXT, так как UUID может быть строкой из вашей системы аутентификации
+    uploaded_by_user_id UUID, -- Используем TEXT, так как UUID может быть строкой из вашей системы аутентификации
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
