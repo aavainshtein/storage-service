@@ -86,53 +86,146 @@ export class FilesService {
     }
   }
 
-  async createFileMetadata(
-    name: string,
-    bucketId: string,
-    size: number,
-    mimeType: string,
-    etag: string,
-    uploadedByUserId: string | undefined, // Может быть undefined для анонимных
-    roles?: string[],
-  ): Promise<{ id: string }> {
-    const fileId = uuidv4();
-
+  async createFileMetadata(input: {
+    name: string;
+    bucketId: string;
+    size: number | null;
+    mimeType: string | null; // Может быть null, если тип не указан
+    etag?: string | null;
+    isUploaded?: boolean; // По умолчанию false, если не указано
+    uploadedByUserId?: string; // Может быть undefined для анонимных пользователей
+    roles?: string[];
+  }): Promise<{ id: string }> {
     const mutation = gql`
-      mutation InsertFile($id: uuid!, $name: String!, $bucket_id: uuid!, $size: bigint!, $mime_type: String!, $etag: String!, $uploaded_by_user_id: String) {
-        insert_storage_files_one(object: {
-          id: $id,
-          name: $name,
-          bucket_id: $bucket_id,
-          size: $size,
-          mime_type: $mime_type,
-          etag: $etag,
-          uploaded_by_user_id: $uploaded_by_user_id
-        }) {
+      mutation InsertFile($object: storage_files_insert_input!) {
+        insert_storage_files_one(object: $object) {
           id
+          updated_at
+          bucket_id
+          created_at
+          etag
+          is_uploaded
+          mime_type
+          name
+          size
+          uploaded_by_user_id
         }
       }
     `;
 
     const variables = {
-      id: fileId,
-      name,
-      bucket_id: bucketId,
-      size,
-      mime_type: mimeType,
-      etag,
-      uploaded_by_user_id: uploadedByUserId,
+      object: {
+        name: input.name,
+        bucket_id: input.bucketId,
+        ...(input.size !== null ? { size: input.size } : {}),
+        ...(input.mimeType ? { mime_type: input.mimeType } : {}),
+        ...(input.etag ? { etag: input.etag } : {}),
+        ...(input.isUploaded !== undefined
+          ? { is_uploaded: input.isUploaded }
+          : { is_uploaded: false }), // По умолчанию false, если не указано
+        uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный, оставляем null
+      },
     };
 
     this.logger.log(
-      `Inserting file metadata for ${name} with ID ${fileId} by user ${uploadedByUserId || 'anonymous'}`,
+      `Inserting file metadata for ${input.name} by user ${input.uploadedByUserId || 'anonymous'}`,
     );
+
     const data = await this.executeGraphQLRequest(
       mutation,
       variables,
-      uploadedByUserId,
-      roles,
+      input.uploadedByUserId,
+      input.roles,
     );
     return data.insert_storage_files_one;
+  }
+
+  async updateFileMetadata(input: {
+    id: string;
+    etag?: string;
+    mimeType?: string;
+    name?: string;
+    size?: number;
+    isUploaded?: boolean; // По умолчанию true, если не указано
+  }): Promise<{
+    id: string;
+    updated_at: string;
+    uploaded_by_user_id: string;
+    size: number;
+    name: string;
+    mime_type: string;
+    is_uploaded: boolean;
+    etag: string;
+    created_at: string;
+    bucket_id: string;
+  }> {
+    if (!input.id) {
+      throw new InternalServerErrorException('File ID is required for update');
+    }
+
+    if (!input.etag && !input.mimeType && !input.name && !input.size) {
+      throw new InternalServerErrorException(
+        'At least one field must be provided for update',
+      );
+    }
+
+    const mutation = gql`
+      mutation Storage_UpdateStorageFile(
+        $etag: String = ""
+        $mime_type: String = ""
+        $name: String = ""
+        $size: bigint = ""
+        $id: uuid = ""
+        $is_uploaded: Boolean = true
+      ) {
+        update_storage_files_by_pk(
+          pk_columns: { id: $id }
+          _set: {
+            etag: $etag
+            mime_type: $mime_type
+            name: $name
+            size: $size
+            is_uploaded: $is_uploaded
+          }
+        ) {
+          id
+          updated_at
+          uploaded_by_user_id
+          size
+          name
+          mime_type
+          is_uploaded
+          etag
+          created_at
+          bucket_id
+        }
+      }
+    `;
+
+    const variables = {
+      id: input.id,
+      ...(input.etag ? { etag: input.etag } : {}),
+      ...(input.mimeType ? { mime_type: input.mimeType } : {}),
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.size !== undefined ? { size: input.size } : {}),
+      is_uploaded: input.isUploaded !== undefined ? input.isUploaded : true, // По умолчанию true, если не указано
+    };
+
+    this.logger.log(
+      `Updating file metadata for ID ${input.id} with fields: ${JSON.stringify(
+        variables,
+      )}`,
+    );
+
+    const data = await this.executeGraphQLRequest(mutation, variables);
+
+    if (!data.update_storage_files_by_pk) {
+      throw new NotFoundException(
+        `File metadata with ID ${input.id} not found or not accessible for update.`,
+      );
+    }
+
+    return data.update_storage_files_by_pk;
   }
 
   async deleteFileMetadata(
