@@ -148,6 +148,8 @@ export class FilesController {
         name: file.originalname,
         size: file.size,
         isUploaded: true, // Устанавливаем true, так как файл успешно загружен
+        uploadedByUserId: uploadedByUserId,
+        roles,
       });
 
       this.logger.log(

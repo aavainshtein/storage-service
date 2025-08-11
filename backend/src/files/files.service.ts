@@ -33,7 +33,7 @@ export class FilesService {
     // Инициализируем клиент один раз с админским секретом
     this.graphqlClient = new GraphQLClient(hasuraEndpoint, {
       headers: {
-        'x-hasura-admin-secret': hasuraAdminSecret,
+        'X-Hasura-Admin-Secret': hasuraAdminSecret,
       },
     });
   }
@@ -64,6 +64,9 @@ export class FilesService {
     try {
       // Используем постоянный клиент, но добавляем заголовки пользователя
       // Примечание: graphql-request позволяет передавать заголовки непосредственно в метод request
+      this.logger.log(`Executing GraphQL request: ${query}`);
+      this.logger.log(`Request headers: ${JSON.stringify(requestHeaders)}`);
+      this.logger.log(`Request variables: ${JSON.stringify(variables)}`);
       return await this.graphqlClient.request(query, variables, requestHeaders);
     } catch (error) {
       // Обработка ошибок, специфичных для GraphQL
@@ -124,7 +127,7 @@ export class FilesService {
         ...(input.isUploaded !== undefined
           ? { is_uploaded: input.isUploaded }
           : { is_uploaded: false }), // По умолчанию false, если не указано
-        uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный, оставляем null
+        // uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный, оставляем null
       },
     };
 
@@ -148,6 +151,8 @@ export class FilesService {
     name?: string;
     size?: number;
     isUploaded?: boolean; // По умолчанию true, если не указано
+    uploadedByUserId?: string; // Может быть undefined для анонимных пользователей
+    roles?: string[];
   }): Promise<{
     id: string;
     updated_at: string;
@@ -218,7 +223,12 @@ export class FilesService {
       )}`,
     );
 
-    const data = await this.executeGraphQLRequest(mutation, variables);
+    const data = await this.executeGraphQLRequest(
+      mutation,
+      variables,
+      input.uploadedByUserId,
+      input.roles,
+    );
 
     if (!data.update_storage_files_by_pk) {
       throw new NotFoundException(
