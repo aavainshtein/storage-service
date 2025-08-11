@@ -1,0 +1,6 @@
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "password": "password1234",
+  "image": "https://example.com/image.png"
+}
