@@ -1,0 +1,27 @@
+{
+  "name": "test-auth",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "tsx watch --clear-screen=false src/index.ts",
+    "migrate": "npx @better-auth/cli migrate --y"
+  },
+  "dependencies": {
+    "@better-auth/cli": "^1.2.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/morgan": "^1.9.9",
+    "better-auth": "^1.2.5",
+    "express": "^5.1.0",
+    "kysely": "^0.27.6",
+    "morgan": "^1.10.0",
+    "pg": "^8.14.1",
+    "tsx": "^4.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "npm@11.3.0"
+}

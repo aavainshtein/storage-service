@@ -9,3 +9,20 @@ array_relationships:
         table:
           name: files
           schema: storage
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - max_upload_size
+        - min_upload_size
+        - presigned_urls_enabled
+        - download_expiration
+        - allowed_mime_types
+        - cache_control
+        - name
+        - created_at
+        - updated_at
+        - id
+      filter: {}
+      allow_aggregations: true
+    comment: ""

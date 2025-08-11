@@ -1,0 +1,18 @@
+table:
+  name: organization
+  schema: public
+array_relationships:
+  - name: invitations
+    using:
+      foreign_key_constraint_on:
+        column: organizationId
+        table:
+          name: invitation
+          schema: public
+  - name: members
+    using:
+      foreign_key_constraint_on:
+        column: organizationId
+        table:
+          name: member
+          schema: public

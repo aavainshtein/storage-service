@@ -1,0 +1,32 @@
+table:
+  name: user
+  schema: public
+array_relationships:
+  - name: accounts
+    using:
+      foreign_key_constraint_on:
+        column: userId
+        table:
+          name: account
+          schema: public
+  - name: invitations
+    using:
+      foreign_key_constraint_on:
+        column: inviterId
+        table:
+          name: invitation
+          schema: public
+  - name: members
+    using:
+      foreign_key_constraint_on:
+        column: userId
+        table:
+          name: member
+          schema: public
+  - name: sessions
+    using:
+      foreign_key_constraint_on:
+        column: userId
+        table:
+          name: session
+          schema: public

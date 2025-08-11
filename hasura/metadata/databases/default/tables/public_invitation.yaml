@@ -1,0 +1,10 @@
+table:
+  name: invitation
+  schema: public
+object_relationships:
+  - name: organization
+    using:
+      foreign_key_constraint_on: organizationId
+  - name: user
+    using:
+      foreign_key_constraint_on: inviterId
