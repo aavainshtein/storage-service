@@ -49,15 +49,16 @@ export class FilesService {
     const requestHeaders: Record<string, string> = {};
 
     if (userId) {
-      requestHeaders['x-hasura-user-id'] = userId;
+      requestHeaders['X-Hasura-User-Id'] = userId;
     }
     if (roles && roles.length > 0) {
-      requestHeaders['x-hasura-role'] = roles[0]; // Основная роль
-      requestHeaders['x-hasura-allowed-roles'] = roles.join(','); // Все разрешенные роли
+      requestHeaders['X-Hasura-Role'] = roles[0]; // Основная роль
+      console.log('requestHeaders:', requestHeaders);
+      // requestHeaders['X-Hasura-Allowed-Roles'] = roles.join(','); // Все разрешенные роли
     } else {
       // Если пользователь не аутентифицирован (аноним), явно указываем роль 'anonymous'
-      requestHeaders['x-hasura-role'] = 'user';
-      requestHeaders['x-hasura-allowed-roles'] = 'user';
+      requestHeaders['X-Hasura-Role'] = 'anonymous';
+      // requestHeaders['X-Hasura-Allowed-Roles'] = 'user';
     }
 
     try {

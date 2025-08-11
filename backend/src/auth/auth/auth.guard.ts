@@ -82,10 +82,10 @@ export class AuthGuard implements CanActivate {
     }
 
     // 2. Попытка аутентификации по Кукам (Session ID)
-    const sessionId = this.extractSessionIdFromCookie(request);
-    if (sessionId && this.betterAuthApiUrl) {
+    // const sessionId = this.extractSessionIdFromCookie(request);
+    if (this.betterAuthApiUrl) {
       try {
-        const userDetails = await this.validateSessionWithBetterAuth(sessionId);
+        const userDetails = await this.validateSessionWithBetterAuth(request);
         request.hasuraUserId = userDetails.userId;
         request.hasuraRoles = userDetails.roles;
         request.isAuthenticated = true;
@@ -138,6 +138,8 @@ export class AuthGuard implements CanActivate {
   private extractSessionIdFromCookie(request: Request): string | null {
     // NestJS не парсит куки по умолчанию. Вам нужно будет использовать 'cookie-parser'
     // Или получать куки напрямую из заголовка 'Cookie'
+    console.log('Extracting session ID from cookie');
+    console.log(request.headers);
     const cookieHeader = request.headers['cookie'];
     if (cookieHeader) {
       const cookies = cookieHeader.split(';').map((c) => c.trim());
@@ -160,49 +162,44 @@ export class AuthGuard implements CanActivate {
   }
 
   private async validateSessionWithBetterAuth(
-    sessionId: string,
+    request: Request,
   ): Promise<{ userId: string; roles: string[] }> {
-    // ЭТО ЗАГЛУШКА! В реальном проекте здесь будет HTTP-запрос к вашему BetterAuth API
-    // для валидации сессии и получения user_id и ролей.
-    this.logger.warn(
-      `MOCK: Validating session ID '${sessionId}' with BetterAuth API.`,
-    );
-
-    // Пример заглушки:
-    if (sessionId === 'mock-valid-session-id') {
-      return { userId: 'mock-user-id-123', roles: ['user'] };
-    }
-    if (sessionId === 'mock-admin-session-id') {
-      return { userId: 'mock-admin-id-456', roles: ['admin', 'user'] };
-    }
-    throw new UnauthorizedException('Invalid session ID with BetterAuth');
-
-    // Пример реального запроса (псевдокод):
-    /*
+    // Реальный запрос к Auth-сервису по эндпоинту /hasura
     try {
-      const response = await fetch(`${this.betterAuthApiUrl}/validate-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ sessionId }),
+      // Используем node-fetch (или встроенный fetch в Node 18+)
+      const fetch = (global as any).fetch || require('node-fetch');
+      const response = await fetch('http://auth:3000/hasura', {
+        method: 'GET',
+        headers: request.headers,
       });
 
+      const bodyText = await response.text();
+
       if (!response.ok) {
-        this.logger.error(`BetterAuth API responded with status ${response.status}`);
-        throw new UnauthorizedException('Session validation failed with BetterAuth');
+        this.logger.error(
+          `Auth service responded with status ${response.status}`,
+        );
+        throw new UnauthorizedException(
+          'Session validation failed with Auth service',
+        );
       }
 
-      const data = await response.json();
-      // Убедитесь, что ваш BetterAuth API возвращает userId и roles в нужном формате
-      if (!data.userId || !data.roles || !Array.isArray(data.roles)) {
-        throw new UnauthorizedException('Invalid response from BetterAuth API');
+      const data = JSON.parse(bodyText);
+
+      console.log('Auth service response data:', data);
+
+      // Ожидаем, что Auth возвращает userId и roles
+      if (!data['X-Hasura-User-Id'] || !data['X-Hasura-Role']) {
+        throw new UnauthorizedException('Invalid response from Auth service');
       }
-      return { userId: data.userId, roles: data.roles };
-    } catch (error) {
-      this.logger.error(`Error connecting to BetterAuth API: ${error.message}`);
-      throw new InternalServerErrorException('BetterAuth API connection error');
+      console.log('Auth service response:', data);
+      return {
+        userId: data['X-Hasura-User-Id'],
+        roles: [data['X-Hasura-Role']],
+      };
+    } catch (error: any) {
+      this.logger.error(`Error connecting to Auth service: ${error.message}`);
+      throw new InternalServerErrorException('Auth service connection error');
     }
-    */
   }
 }
