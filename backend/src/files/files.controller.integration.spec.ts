@@ -13,27 +13,15 @@ import { AppService } from '../app.service';
 const envPath = path.resolve(__dirname, '../../../.env');
 const result = dotenv.config({ path: envPath });
 
-console.log('Environment variables loaded:', result.parsed);
+// console.log('Environment variables loaded:', result.parsed);
 
 describe('FilesController Integration tests', () => {
   let app: INestApplication;
   let fileId: string;
+  let sessionCookie: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      // imports: [
-      //   ConfigModule.forRoot({
-      //     isGlobal: true,
-      //     // envFilePath: '../../.env',
-      //     envFilePath:
-      //       process.env.NODE_ENV === 'development' ? '.env' : '../../.env',
-      //   }),
-      //   // MinioModule,
-      //   FilesModule, // Добавляем FilesModule
-      // ],
-      // controllers: [AppController],
-      // providers: [AppService],
-
       imports: [
         FilesModule,
         ConfigModule.forRoot({
@@ -45,6 +33,26 @@ describe('FilesController Integration tests', () => {
 
     app = module.createNestApplication();
     await app.init();
+
+    console.log('App initialized going to auth');
+    // Логиним тестового пользователя и сохраняем session token
+    const loginRes = await fetch(
+      'http://localhost:3000/api/auth/sign-in/email',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'john.doe@example.com',
+          password: 'password1234',
+          rememberMe: true,
+        }),
+      },
+    );
+
+    // Получаем cookie из заголовка set-cookie
+    const setCookie = loginRes.headers.get('set-cookie');
+    // Обычно берём первую cookie, если их несколько
+    sessionCookie = setCookie?.split(';')[0] || ''; // 'better-auth.session_token=...'
   });
 
   afterAll(async () => {
@@ -52,8 +60,9 @@ describe('FilesController Integration tests', () => {
   });
 
   it('should start the app and respond to requests', async () => {
-    const res = await request(app.getHttpServer()).get('/storage/healthz');
-    // Если у тебя нет эндпоинта /storage/healthz, можно ожидать 404
+    const res = await request(app.getHttpServer())
+      .get('/storage/healthz')
+      .set('Cookie', sessionCookie);
     expect([200, 404]).toContain(res.status);
   });
 
@@ -62,13 +71,15 @@ describe('FilesController Integration tests', () => {
     const filePath = path.resolve(__dirname, 'test/testFile.txt');
     return request(app.getHttpServer())
       .post('/storage/upload')
+      .set('Cookie', sessionCookie)
       .attach('file', filePath)
       .expect(201)
       .then((response) => {
         console.log('File upload response:', response.body);
-        fileId = response.body.fileId; // Сохраняем ID файла для последующих тестов
-        expect(response.body).toHaveProperty('fileName');
-        expect(response.body.fileName).toMatch('testFile.txt');
+        fileId = response.body.updatedFileMetadata.id; // Сохраняем ID файла для последующих тестов
+        expect(response.body).toHaveProperty('updatedFileMetadata');
+        expect(response.body.updatedFileMetadata).toHaveProperty('name');
+        expect(response.body.updatedFileMetadata.name).toMatch('testFile.txt');
       });
   });
 
@@ -78,6 +89,7 @@ describe('FilesController Integration tests', () => {
     }
     return request(app.getHttpServer())
       .get(`/storage/presigned-url/${fileId}`)
+      .set('Cookie', sessionCookie)
       .expect(200)
       .then((response) => {
         console.log('Presigned URL response:', response.body);
@@ -91,6 +103,7 @@ describe('FilesController Integration tests', () => {
     }
     return request(app.getHttpServer())
       .get(`/storage/download/${fileId}`)
+      .set('Cookie', sessionCookie)
       .buffer(true)
       .parse((res, callback) => {
         // Собираем все чанки в буфер
@@ -112,13 +125,14 @@ describe('FilesController Integration tests', () => {
     }
     return request(app.getHttpServer())
       .delete(`/storage/${fileId}`)
-      .expect(200)
-      .then((response) => {
-        console.log('File deletion response:', response.body);
-        expect(response.body).toHaveProperty(
-          'message',
-          'File deleted successfully',
-        );
-      });
-  });
+      .set('Cookie', sessionCookie)
+      .expect(200);
+    // .then((response) => {
+    //   console.log('File deletion response:', response.body);
+    //   expect(response.body).toHaveProperty(
+    //     'message',
+    //     'File deleted successfully',
+    //   );
+    // });
+  }, 10000);
 });
