@@ -26,7 +26,7 @@ import { FilesService } from './files.service';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 import { Multer } from 'multer';
-import { AuthGuard } from '../auth/auth/auth.guard';
+import { AuthGuard } from '../auth/auth.guard';
 
 interface RequestWithHasuraUserId extends ExpressRequest {
   hasuraUserId?: string;
@@ -88,6 +88,7 @@ export class FilesController {
         uploadedByUserId,
         roles,
       );
+
       if (!bucketMetadata) {
         throw new InternalServerErrorException(
           `Bucket '${selectedBucketName}' not found in metadata.`,
@@ -198,7 +199,7 @@ export class FilesController {
         throw new NotFoundException(`File with ID ${fileId} not found.`);
       }
 
-      const objectName = fileMetadata.name; // Имя файла в MinIO
+      const objectName = fileMetadata.id; // Имя файла в MinIO
       const fileStream = await this.minioService.downloadFile(
         objectName,
         fileMetadata.bucket.name,
@@ -253,14 +254,24 @@ export class FilesController {
       }
       // Теперь, когда мы знаем, что пользователь имеет доступ к метаданным,
       // Hasura также проверит разрешение на удаление при вызове deleteFileMetadata
-      const objectName = fileMetadata.name;
+
+      console.log('going to delete file with metadata:', fileMetadata);
+      const objectName = fileMetadata.id;
 
       try {
-        await this.filesService.deleteFileMetadata(fileId, userId, roles); // Передаем userId и roles
-        await this.minioService.deleteFile(
+        console.log('inside try');
+        const deletedFileId = await this.filesService.deleteFileMetadata(
+          fileId,
+          userId,
+          roles,
+        ); // Передаем userId и roles
+        const deletedMinioFile = await this.minioService.deleteFile(
           objectName,
           fileMetadata.bucket.name,
         );
+
+        console.log('deleted minio file:', deletedMinioFile);
+        console.log('deleted file id:', deletedFileId);
       } catch (error) {
         this.logger.error(
           `Error during file deletion: ${error.message}`,
@@ -272,7 +283,12 @@ export class FilesController {
         throw new InternalServerErrorException('Failed to delete file');
       }
 
-      return { message: 'File deleted successfully', fileId };
+      console.log('deleted file metadata from Hasura and file from s3');
+
+      res.status(200).json({
+        message: 'File deleted successfully',
+        fileId: fileMetadata.id,
+      });
     } catch (error) {
       this.logger.error(
         `Error during file deletion: ${error.message}`,
