@@ -72,7 +72,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
+      MINIO_DEFAULT_BUCKET_NAME: ${MINIO_DEFAULT_BUCKET_NAME}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
     command: server /data --console-address ":9001"
     volumes:
@@ -104,7 +104,7 @@ services:
 
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME} # constante-storage
+      MINIO_DEFAULT_BUCKET_NAME: ${MINIO_DEFAULT_BUCKET_NAME} # constante-storage
       STORAGE_PUBLIC_URL: http://localhost:8000 # Публичный URL для генерации ссылок
 
       BETTER_AUTH_API_URL: ${BETTER_AUTH_API_URL} # URL BetterAuth API
