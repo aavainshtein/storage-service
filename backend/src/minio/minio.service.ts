@@ -11,7 +11,7 @@ import { Readable } from 'stream';
 @Injectable()
 export class MinioService {
   private readonly minioClient: Minio.Client;
-  private readonly bucketName: string;
+  private readonly defaultBucketName: string;
   private readonly logger = new Logger(MinioService.name);
 
   constructor(private configService: ConfigService) {
@@ -21,8 +21,9 @@ export class MinioService {
 
     // console.log('configService:', this.configService.get('MINIO_ROOT_USER'));
 
-    this.bucketName =
-      this.configService.get<string>('MINIO_BUCKET_NAME') || 'default-bucket';
+    this.defaultBucketName =
+      this.configService.get<string>('MINIO_DEFAULT_BUCKET_NAME') ||
+      'default-bucket';
 
     if (!endPoint) {
       this.logger.error('MinIO configuration is missing MINIO_ENDPOINT.');
@@ -42,10 +43,12 @@ export class MinioService {
         'MinIO configuration error: MINIO_SECRET_KEY.',
       );
     }
-    if (!this.bucketName) {
-      this.logger.error('MinIO configuration is missing MINIO_BUCKET_NAME.');
+    if (!this.defaultBucketName) {
+      this.logger.error(
+        'MinIO configuration is missing MINIO_DEFAULT_BUCKET_NAME.',
+      );
       throw new InternalServerErrorException(
-        'MinIO configuration error: MINIO_BUCKET_NAME',
+        'MinIO configuration error: MINIO_DEFAULT_BUCKET_NAME',
       );
     }
 
@@ -61,21 +64,21 @@ export class MinioService {
     });
 
     this.logger.log(
-      `MinIO client initialized for endpoint: ${endPoint}, bucket: ${this.bucketName}`,
+      `MinIO client initialized for endpoint: ${endPoint}, default bucket: ${this.defaultBucketName}`,
     );
 
-    // Проверяем существование бакета при старте
-    this.ensureBucketExists();
+    // Проверяем существование дефолтного бакета при старте
+    this.ensureBucketExists(this.defaultBucketName);
   }
 
-  private async ensureBucketExists() {
+  private async ensureBucketExists(bucketName: string) {
     try {
-      const exists = await this.minioClient.bucketExists(this.bucketName);
+      const exists = await this.minioClient.bucketExists(bucketName);
       if (!exists) {
-        await this.minioClient.makeBucket(this.bucketName, 'us-east-1'); // Регион по умолчанию
-        this.logger.log(`Bucket '${this.bucketName}' created successfully.`);
+        await this.minioClient.makeBucket(bucketName, 'us-east-1'); // Регион по умолчанию
+        this.logger.log(`Bucket '${bucketName}' created successfully.`);
       } else {
-        this.logger.log(`Bucket '${this.bucketName}' already exists.`);
+        this.logger.log(`Bucket '${bucketName}' already exists.`);
       }
     } catch (error) {
       this.logger.error(`Error ensuring MinIO bucket exists: ${error.message}`);
@@ -85,19 +88,26 @@ export class MinioService {
     }
   }
 
-  async uploadFile(
-    objectName: string,
-    stream: Readable,
-    size: number,
-    metaData: Minio.ItemBucketMetadata,
-  ): Promise<any> {
+  async uploadFile({
+    objectName,
+    stream,
+    size,
+    metaData,
+    bucketName,
+  }: {
+    objectName: string;
+    stream: Readable;
+    size: number;
+    metaData: Minio.ItemBucketMetadata;
+    bucketName?: string;
+  }): Promise<any> {
     // #TODO тип
+    const targetBucket = bucketName || this.defaultBucketName;
+    await this.ensureBucketExists(targetBucket);
     try {
-      this.logger.log(
-        `Uploading file ${objectName} to bucket ${this.bucketName}`,
-      );
+      this.logger.log(`Uploading file ${objectName} to bucket ${targetBucket}`);
       return await this.minioClient.putObject(
-        this.bucketName,
+        targetBucket,
         objectName,
         stream,
         size,
@@ -111,12 +121,16 @@ export class MinioService {
     }
   }
 
-  async downloadFile(objectName: string): Promise<Readable> {
+  async downloadFile(
+    objectName: string,
+    bucketName?: string,
+  ): Promise<Readable> {
+    const targetBucket = bucketName || this.defaultBucketName;
     try {
       this.logger.log(
-        `Downloading file ${objectName} from bucket ${this.bucketName}`,
+        `Downloading file ${objectName} from bucket ${targetBucket}`,
       );
-      return await this.minioClient.getObject(this.bucketName, objectName);
+      return await this.minioClient.getObject(targetBucket, objectName);
     } catch (error) {
       this.logger.error(
         `Error downloading file ${objectName}: ${error.message}`,
@@ -130,12 +144,13 @@ export class MinioService {
     }
   }
 
-  async deleteFile(objectName: string): Promise<void> {
+  async deleteFile(objectName: string, bucketName?: string): Promise<void> {
+    const targetBucket = bucketName || this.defaultBucketName;
     try {
       this.logger.log(
-        `Deleting file ${objectName} from bucket ${this.bucketName}`,
+        `Deleting file ${objectName} from bucket ${targetBucket}`,
       );
-      await this.minioClient.removeObject(this.bucketName, objectName);
+      await this.minioClient.removeObject(targetBucket, objectName);
     } catch (error) {
       this.logger.error(`Error deleting file ${objectName}: ${error.message}`);
       throw new InternalServerErrorException(
@@ -147,13 +162,15 @@ export class MinioService {
   async getPresignedUrl(
     objectName: string,
     expiry: number = 300,
+    bucketName?: string,
   ): Promise<string> {
+    const targetBucket = bucketName || this.defaultBucketName;
     try {
       this.logger.log(
-        `Generating presigned URL for ${objectName} with expiry ${expiry}s`,
+        `Generating presigned URL for ${objectName} in bucket ${targetBucket} with expiry ${expiry}s`,
       );
       return await this.minioClient.presignedGetObject(
-        this.bucketName,
+        targetBucket,
         objectName,
         expiry,
       );
@@ -168,11 +185,14 @@ export class MinioService {
   }
 
   // Метод для получения информации о файле (если потребуется eTag или другие метаданные)
-  async statFile(objectName: string): Promise<any> {
+  async statFile(objectName: string, bucketName?: string): Promise<any> {
     // #TODO тип
+    const targetBucket = bucketName || this.defaultBucketName;
     try {
-      this.logger.log(`Getting stats for file ${objectName}`);
-      return await this.minioClient.statObject(this.bucketName, objectName);
+      this.logger.log(
+        `Getting stats for file ${objectName} in bucket ${targetBucket}`,
+      );
+      return await this.minioClient.statObject(targetBucket, objectName);
     } catch (error) {
       this.logger.error(
         `Error getting stats for file ${objectName}: ${error.message}`,
