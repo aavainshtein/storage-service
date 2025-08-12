@@ -31,6 +31,7 @@ import { AuthGuard } from '../auth/auth/auth.guard';
 interface RequestWithHasuraUserId extends ExpressRequest {
   hasuraUserId?: string;
   hasuraRoles?: string[];
+  bucketName?: string;
 }
 
 @Controller('storage')
@@ -45,10 +46,12 @@ export class FilesController {
     private readonly filesService: FilesService,
     private readonly configService: ConfigService,
   ) {
-    const bucketName = this.configService.get<string>('MINIO_BUCKET_NAME');
+    const bucketName = this.configService.get<string>(
+      'MINIO_DEFAULT_BUCKET_NAME',
+    );
     if (!bucketName) {
       throw new Error(
-        'MINIO_BUCKET_NAME is not defined in environment variables',
+        'MINIO_DEFAULT_BUCKET_NAME is not defined in environment variables',
       );
     }
     this.bucketName = bucketName;
@@ -76,19 +79,18 @@ export class FilesController {
 
     const uploadedByUserId = req.hasuraUserId; // Может быть undefined, если пользователь анонимный
     const roles = req.hasuraRoles;
-
-    // const objectName = `${file.originalname}`; // Имя файла в MinIO, можно использовать UUID
+    const selectedBucketName = req?.bucketName || this.bucketName;
 
     try {
       // Проверяем бакет и его настройки (размер, тип)
       const bucketMetadata = await this.filesService.getBucketByName(
-        this.bucketName,
+        selectedBucketName,
         uploadedByUserId,
         roles,
       );
       if (!bucketMetadata) {
         throw new InternalServerErrorException(
-          `Bucket '${this.bucketName}' not found in metadata.`,
+          `Bucket '${selectedBucketName}' not found in metadata.`,
         );
       }
 
@@ -127,12 +129,13 @@ export class FilesController {
       }
 
       const fileStream = Readable.from(file.buffer);
-      const uploadedInfo = await this.minioService.uploadFile(
-        fileMetadata.id, // Используем ID метаданных как имя объекта
-        fileStream,
-        file.size,
-        { 'Content-Type': file.mimetype, name: file.originalname },
-      );
+      const uploadedInfo = await this.minioService.uploadFile({
+        objectName: fileMetadata.id, // Используем ID записи hasura storage.files как имя объекта
+        stream: fileStream,
+        size: file.size,
+        metaData: { 'Content-Type': file.mimetype, name: file.originalname },
+        bucketName: selectedBucketName,
+      });
 
       if (!uploadedInfo) {
         throw new InternalServerErrorException(
@@ -196,7 +199,10 @@ export class FilesController {
       }
 
       const objectName = fileMetadata.name; // Имя файла в MinIO
-      const fileStream = await this.minioService.downloadFile(objectName);
+      const fileStream = await this.minioService.downloadFile(
+        objectName,
+        fileMetadata.bucket.name,
+      );
 
       res.setHeader('Content-Type', fileMetadata.mime_type);
       res.setHeader(
@@ -249,8 +255,22 @@ export class FilesController {
       // Hasura также проверит разрешение на удаление при вызове deleteFileMetadata
       const objectName = fileMetadata.name;
 
-      await this.minioService.deleteFile(objectName);
-      await this.filesService.deleteFileMetadata(fileId, userId, roles); // Передаем userId и roles
+      try {
+        await this.filesService.deleteFileMetadata(fileId, userId, roles); // Передаем userId и roles
+        await this.minioService.deleteFile(
+          objectName,
+          fileMetadata.bucket.name,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Error during file deletion: ${error.message}`,
+          error.stack,
+        );
+        if (error instanceof NotFoundException) {
+          throw error;
+        }
+        throw new InternalServerErrorException('Failed to delete file');
+      }
 
       return { message: 'File deleted successfully', fileId };
     } catch (error) {
@@ -273,6 +293,7 @@ export class FilesController {
   ) {
     const userId = req.hasuraUserId;
     const roles = req.hasuraRoles;
+    const selectedBucketName = req?.bucketName || this.bucketName;
 
     try {
       // Здесь Hasura проверит, имеет ли пользователь доступ к метаданным файла fileId
@@ -289,13 +310,13 @@ export class FilesController {
 
       // Здесь GetBucketByName также будет использовать заголовки пользователя
       const bucketMetadata = await this.filesService.getBucketByName(
-        this.bucketName,
+        selectedBucketName,
         userId,
         roles,
       );
       if (!bucketMetadata || !bucketMetadata.presigned_urls_enabled) {
         throw new BadRequestException(
-          `Presigned URLs are not enabled for bucket '${this.bucketName}' or bucket not accessible.`,
+          `Presigned URLs are not enabled for bucket '${selectedBucketName}' or bucket not accessible.`,
         );
       }
 
@@ -307,6 +328,7 @@ export class FilesController {
       const url = await this.minioService.getPresignedUrl(
         objectName,
         expirySeconds,
+        selectedBucketName,
       );
       return { url };
     } catch (error) {
