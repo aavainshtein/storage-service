@@ -78,12 +78,12 @@ describe('MinioService', () => {
       mockMinioClient.putObject.mockResolvedValue(expectedResult);
 
       // Act
-      const result = await service.uploadFile(
+      const result = await service.uploadFile({
         objectName,
         stream,
         size,
         metaData,
-      );
+      });
       // console.log('Upload result:', result);
       // Assert
       expect(result).toEqual(expectedResult);
@@ -109,7 +109,7 @@ describe('MinioService', () => {
 
       // Act & Assert
       await expect(
-        service.uploadFile(objectName, stream, size, metaData),
+        service.uploadFile({ objectName, stream, size, metaData }),
       ).rejects.toThrow(`Failed to upload file: ${errorMessage}`);
 
       expect(mockMinioClient.putObject).toHaveBeenCalledWith(
@@ -143,12 +143,12 @@ describe('MinioService', () => {
         const stream = Readable.from([testCase.content]);
         const size = Buffer.byteLength(testCase.content);
 
-        const result = await service.uploadFile(
-          testCase.objectName,
+        const result = await service.uploadFile({
+          objectName: testCase.objectName,
           stream,
           size,
-          testCase.metaData,
-        );
+          metaData: testCase.metaData,
+        });
 
         expect(result).toEqual({ etag: 'mock-etag' });
         expect(mockMinioClient.putObject).toHaveBeenCalledWith(

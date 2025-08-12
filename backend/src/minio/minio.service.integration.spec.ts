@@ -38,12 +38,12 @@ describe('MinioService Integration Tests', () => {
   describe('Real MinIO Operations', () => {
     it('should upload and download file successfully', async () => {
       // Act - Upload
-      const uploadResult = await service.uploadFile(
+      const uploadResult = await service.uploadFile({
         objectName,
         stream,
         size,
         metaData,
-      );
+      });
       expect(uploadResult.etag).toBeDefined();
 
       // Act - Download

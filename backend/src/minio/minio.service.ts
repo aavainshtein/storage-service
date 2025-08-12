@@ -144,13 +144,20 @@ export class MinioService {
     }
   }
 
-  async deleteFile(objectName: string, bucketName?: string): Promise<void> {
+  async deleteFile(
+    objectName: string,
+    bucketName?: string,
+  ): Promise<{ message: string }> {
     const targetBucket = bucketName || this.defaultBucketName;
     try {
       this.logger.log(
         `Deleting file ${objectName} from bucket ${targetBucket}`,
       );
       await this.minioClient.removeObject(targetBucket, objectName);
+      this.logger.log(`File ${objectName} deleted successfully.`);
+      return {
+        message: `File ${objectName} deleted successfully from s3 storage.`,
+      };
     } catch (error) {
       this.logger.error(`Error deleting file ${objectName}: ${error.message}`);
       throw new InternalServerErrorException(
