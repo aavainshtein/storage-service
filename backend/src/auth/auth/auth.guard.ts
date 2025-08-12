@@ -135,32 +135,6 @@ export class AuthGuard implements CanActivate {
     return jwt.verify(token, this.hasuraJwtSecret, { algorithms: ['HS256'] }); // Обычно HS256 для симметричных секретов
   }
 
-  private extractSessionIdFromCookie(request: Request): string | null {
-    // NestJS не парсит куки по умолчанию. Вам нужно будет использовать 'cookie-parser'
-    // Или получать куки напрямую из заголовка 'Cookie'
-    console.log('Extracting session ID from cookie');
-    console.log(request.headers);
-    const cookieHeader = request.headers['cookie'];
-    if (cookieHeader) {
-      const cookies = cookieHeader.split(';').map((c) => c.trim());
-      const connectSidCookie = cookies.find((cookie) =>
-        cookie.startsWith('connect.sid='),
-      );
-      if (connectSidCookie) {
-        // Удаляем 'connect.sid=' и '.s:' и '.<signature>'
-        let sessionId = connectSidCookie.substring('connect.sid='.length);
-        // Если куки включают префикс "s:" и суффикс с подписью, как у Express Session
-        if (sessionId.startsWith('s%3A')) {
-          // s: в URL-кодировке
-          sessionId = decodeURIComponent(sessionId.substring(4)); // Удаляем 's%3A'
-          sessionId = sessionId.split('.')[0]; // Удаляем подпись
-        }
-        return sessionId;
-      }
-    }
-    return null;
-  }
-
   private async validateSessionWithBetterAuth(
     request: Request,
   ): Promise<{ userId: string; roles: string[] }> {
