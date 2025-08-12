@@ -1,6 +1,6 @@
 // src/auth/auth.module.ts
 import { Module } from '@nestjs/common';
-import { AuthGuard } from './auth/auth.guard';
+import { AuthGuard } from './auth.guard';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({

@@ -37,9 +37,9 @@ export class AuthGuard implements CanActivate {
     )!;
 
     if (!this.hasuraJwtSecret) {
-      this.logger.error(
-        'HASURA_GRAPHQL_JWT_SECRET is not defined in environment variables.',
-      );
+      // this.logger.error(
+      //   'HASURA_GRAPHQL_JWT_SECRET is not defined in environment variables.',
+      // );
       // В продакшене лучше сразу бросать исключение
     }
 
@@ -142,7 +142,9 @@ export class AuthGuard implements CanActivate {
     try {
       // Используем node-fetch (или встроенный fetch в Node 18+)
       const fetch = (global as any).fetch || require('node-fetch');
-      const response = await fetch('http://auth:3000/hasura', {
+
+      console.log('going to auth with headers:', request.headers);
+      const response = await fetch('http://localhost:3000/hasura', {
         method: 'GET',
         headers: request.headers,
       });
