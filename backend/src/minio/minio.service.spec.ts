@@ -14,7 +14,7 @@ describe('MinioService', () => {
         MINIO_ENDPOINT: 'localhost:9000',
         MINIO_ACCESS_KEY: 'minioadmin',
         MINIO_SECRET_KEY: 'minioadminpassword',
-        MINIO_BUCKET_NAME: 'constante-storage',
+        MINIO_DEFAULT_BUCKET_NAME: 'constante-storage',
       };
       return config[key];
     }),
@@ -60,7 +60,9 @@ describe('MinioService', () => {
 
   it('should initialize with mocked configuration', () => {
     expect(configService.get('MINIO_ENDPOINT')).toBe('localhost:9000');
-    expect(configService.get('MINIO_BUCKET_NAME')).toBe('constante-storage');
+    expect(configService.get('MINIO_DEFAULT_BUCKET_NAME')).toBe(
+      'constante-storage',
+    );
   });
 
   describe('uploadFile', () => {
