@@ -275,7 +275,17 @@ export class FilesService {
     fileId: string,
     userId?: string,
     roles?: string[],
-  ): Promise<any> {
+  ): Promise<{
+    id: string;
+    bucket: { id: string; name: string };
+    name: string;
+    size: number;
+    mime_type: string;
+    etag: string;
+    uploaded_by_user_id: string;
+    created_at: string;
+    updated_at: string;
+  }> {
     const query = gql`
       query GetFile($id: uuid!) {
         storage_files_by_pk(id: $id) {
@@ -289,6 +299,7 @@ export class FilesService {
           created_at
           updated_at
           bucket {
+            id
             name
           }
         }
