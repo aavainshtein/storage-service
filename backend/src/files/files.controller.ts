@@ -38,8 +38,7 @@ interface RequestWithHasuraUserId extends ExpressRequest {
 @UseGuards(AuthGuard)
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
-  private readonly bucketName: string;
-  private readonly storagePublicUrl: string;
+  private readonly defaultBucketName: string;
 
   constructor(
     private readonly minioService: MinioService,
@@ -54,16 +53,8 @@ export class FilesController {
         'MINIO_DEFAULT_BUCKET_NAME is not defined in environment variables',
       );
     }
-    this.bucketName = bucketName;
+    this.defaultBucketName = bucketName;
 
-    const storagePublicUrl =
-      this.configService.get<string>('STORAGE_PUBLIC_URL');
-    if (!storagePublicUrl) {
-      throw new Error(
-        'STORAGE_PUBLIC_URL is not defined in environment variables',
-      );
-    }
-    this.storagePublicUrl = storagePublicUrl;
   }
 
   @Post('upload')
@@ -79,7 +70,7 @@ export class FilesController {
 
     const uploadedByUserId = req.hasuraUserId; // Может быть undefined, если пользователь анонимный
     const roles = req.hasuraRoles;
-    const selectedBucketName = req?.bucketName || this.bucketName;
+    const selectedBucketName = req?.bucketName || this.defaultBucketName;
 
     try {
       // Проверяем бакет и его настройки (размер, тип)
@@ -259,7 +250,6 @@ export class FilesController {
       const objectName = fileMetadata.id;
 
       try {
-        console.log('inside try');
         const deletedFileId = await this.filesService.deleteFileMetadata(
           fileId,
           userId,
@@ -309,7 +299,7 @@ export class FilesController {
   ) {
     const userId = req.hasuraUserId;
     const roles = req.hasuraRoles;
-    const selectedBucketName = req?.bucketName || this.bucketName;
+    // const selectedBucketName = req?.bucketName || this.bucketName;
 
     try {
       // Здесь Hasura проверит, имеет ли пользователь доступ к метаданным файла fileId
@@ -326,17 +316,17 @@ export class FilesController {
 
       // Здесь GetBucketByName также будет использовать заголовки пользователя
       const bucketMetadata = await this.filesService.getBucketByName(
-        selectedBucketName,
+        fileMetadata.bucket.name,
         userId,
         roles,
       );
       if (!bucketMetadata || !bucketMetadata.presigned_urls_enabled) {
         throw new BadRequestException(
-          `Presigned URLs are not enabled for bucket '${selectedBucketName}' or bucket not accessible.`,
+          `Presigned URLs are not enabled for bucket '${fileMetadata.bucket.name}' or bucket not accessible.`,
         );
       }
 
-      const objectName = fileMetadata.name;
+      const objectName = fileMetadata.id;
       const expirySeconds = expiry
         ? parseInt(expiry, 10)
         : bucketMetadata.download_expiration || 300; // По умолчанию 300 секунд или из метаданных бакета
@@ -344,7 +334,7 @@ export class FilesController {
       const url = await this.minioService.getPresignedUrl(
         objectName,
         expirySeconds,
-        selectedBucketName,
+        fileMetadata.bucket.name,
       );
       return { url };
     } catch (error) {
