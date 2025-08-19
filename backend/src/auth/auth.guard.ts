@@ -37,9 +37,9 @@ export class AuthGuard implements CanActivate {
     )!;
 
     if (!this.hasuraJwtSecret) {
-      // this.logger.error(
-      //   'HASURA_GRAPHQL_JWT_SECRET is not defined in environment variables.',
-      // );
+      this.logger.error(
+        'HASURA_GRAPHQL_JWT_SECRET is not defined in environment variables.',
+      );
       // В продакшене лучше сразу бросать исключение
     }
 
@@ -48,13 +48,6 @@ export class AuthGuard implements CanActivate {
         'BETTER_AUTH_API_URL is not defined. Cookie authentication will be skipped or mocked.',
       );
     }
-
-    // Инициализируем jwksClient, если JWT-секрет является JWKS-URL
-    // В нашем случае, HASURA_GRAPHQL_JWT_SECRET будет простой строкой, поэтому jwksClient не нужен для валидации
-    // Если бы Hasura использовала JWKS, то инициализация была бы такой:
-    // this.jwksClient = jwksClient({
-    //   jwksUri: this.hasuraJwtSecret // Если секрет это URL JWKS
-    // });
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -67,9 +60,9 @@ export class AuthGuard implements CanActivate {
       try {
         const decodedJwt = await this.validateJwt(jwtToken);
         request.hasuraUserId =
-          decodedJwt['https://hasura.io/jwt/claims']['x-hasura-user-id'];
+          decodedJwt['https://hasura.io/jwt/claims']['X-Hasura-User-Id'];
         request.hasuraRoles =
-          decodedJwt['https://hasura.io/jwt/claims']['x-hasura-allowed-roles'];
+          decodedJwt['https://hasura.io/jwt/claims']['X-Hasura-Roles'];
         request.isAuthenticated = true;
         this.logger.debug(
           `Authenticated by JWT: User ID ${request.hasuraUserId}, Roles: ${request.hasuraRoles}`,
@@ -119,15 +112,6 @@ export class AuthGuard implements CanActivate {
   }
 
   private async validateJwt(token: string): Promise<any> {
-    // Если HASURA_GRAPHQL_JWT_SECRET это JWKS URL:
-    // const decodedHeader = jwt.decode(token, { complete: true })?.header;
-    // if (!decodedHeader || !decodedHeader.kid) {
-    //   throw new UnauthorizedException('Invalid JWT token header or missing KID');
-    // }
-    // const key = await this.jwksClient.getSigningKey(decodedHeader.kid);
-    // const signingKey = key.getPublicKey();
-    // return jwt.verify(token, signingKey, { algorithms: ['RS256'] }); // Или другой алгоритм
-
     // В нашем случае HASURA_GRAPHQL_JWT_SECRET это простая строка:
     if (!this.hasuraJwtSecret) {
       throw new InternalServerErrorException('JWT secret is not configured.');
