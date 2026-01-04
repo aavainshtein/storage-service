@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS storage.files (
     mime_type TEXT ,
     etag TEXT,
     uploaded_by_user_id UUID, -- Используем TEXT, так как UUID может быть строкой из вашей системы аутентификации
+    is_uploaded BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
