@@ -133,12 +133,18 @@ export class FilesService {
         ...(input.isUploaded !== undefined
           ? { is_uploaded: input.isUploaded }
           : { is_uploaded: false }), // По умолчанию false, если не указано
-        uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный или админ, оставляем null
       },
     };
 
+    // Если роль 'user', мы НЕ отправляем uploaded_by_user_id, так как в Hasura настроен Column Preset (set),
+    // который автоматически подставляет X-Hasura-User-Id и УДАЛЯЕТ это поле из insert_input.
+    const isUserRole = input.roles && input.roles.includes('user');
+    if (!isUserRole && input.uploadedByUserId) {
+      variables.object['uploaded_by_user_id'] = input.uploadedByUserId;
+    }
+
     this.logger.log(
-      `Inserting file metadata for ${input.name} by user ${input.uploadedByUserId || 'anonymous'}`,
+      `Inserting file metadata for ${input.name} by user ${input.uploadedByUserId || 'anonymous'} (Role: ${input.roles?.[0] || 'admin'})`,
     );
 
     const data = await this.executeGraphQLRequest(
