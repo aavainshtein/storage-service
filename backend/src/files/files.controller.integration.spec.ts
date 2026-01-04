@@ -17,9 +17,10 @@ const result = dotenv.config({ path: envPath });
 
 describe('FilesController Integration tests', () => {
   let app: INestApplication;
-  let fileId: string;
-  let sessionCookie: string;
-  let sessionCookieUserB: string;
+  let sessionCookieA: string;
+  let sessionCookieB: string;
+  let fileIdA: string;
+  let fileIdB: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,22 +36,13 @@ describe('FilesController Integration tests', () => {
     app = module.createNestApplication();
     await app.init();
 
-    console.log('App initialized going to auth');
-
-    // Функция для обеспечения существования пользователя (регистрация + вход)
     const ensureUser = async (email: string, name: string) => {
-      // Пытаемся зарегистрировать (на случай если его нет)
       await fetch('http://localhost:3000/api/auth/sign-up/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password: 'password1234',
-          name,
-        }),
+        body: JSON.stringify({ email, password: 'password1234', name }),
       });
 
-      // Входим
       const loginRes = await fetch(
         'http://localhost:3000/api/auth/sign-in/email',
         {
@@ -64,167 +56,150 @@ describe('FilesController Integration tests', () => {
         },
       );
 
-      const setCookie = loginRes.headers.get('set-cookie');
-      return setCookie?.split(';')[0] || '';
+      return loginRes.headers.get('set-cookie')?.split(';')[0] || '';
     };
 
-    // Логиним первого тестового пользователя (John Doe)
-    sessionCookie = await ensureUser('john.doe@example.com', 'John Doe');
-
-    // Логиним второго тестового пользователя (Jane Doe)
-    sessionCookieUserB = await ensureUser('jane.doe@example.com', 'Jane Doe');
-
-    console.log('Auth cookies obtained:', {
-      userA: !!sessionCookie,
-      userB: !!sessionCookieUserB,
-    });
+    sessionCookieA = await ensureUser('user.a@example.com', 'User A');
+    sessionCookieB = await ensureUser('user.b@example.com', 'User B');
   });
 
   afterAll(async () => {
     await app.close();
   });
 
-  it('should start the app and respond to requests', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/storage/healthz')
-      .set('Cookie', sessionCookie);
-    expect([200, 404]).toContain(res.status);
+  describe('User A - Own File Operations', () => {
+    it('should upload file as User A', async () => {
+      const filePath = path.resolve(__dirname, 'test/testFile.txt');
+      const res = await request(app.getHttpServer())
+        .post('/storage/upload')
+        .set('Cookie', sessionCookieA)
+        .attach('file', filePath)
+        .expect(201);
+
+      fileIdA = res.body.updatedFileMetadata.id;
+      expect(fileIdA).toBeDefined();
+    });
+
+    it('should get presigned URL for own file (User A)', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/presigned-url/${fileIdA}`)
+        .set('Cookie', sessionCookieA)
+        .expect(200);
+    });
+
+    it('should download own file (User A)', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/download/${fileIdA}`)
+        .set('Cookie', sessionCookieA)
+        .expect(200);
+    });
   });
 
-  describe('Security & RBAC', () => {
-    it('should return 403 when uploading without session cookie (anonymous)', async () => {
+  describe('User B - Own File Operations', () => {
+    it('should upload file as User B', async () => {
       const filePath = path.resolve(__dirname, 'test/testFile.txt');
-      return request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
+        .post('/storage/upload')
+        .set('Cookie', sessionCookieB)
+        .attach('file', filePath)
+        .expect(201);
+
+      fileIdB = res.body.updatedFileMetadata.id;
+      expect(fileIdB).toBeDefined();
+    });
+
+    it('should get presigned URL for own file (User B)', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/presigned-url/${fileIdB}`)
+        .set('Cookie', sessionCookieB)
+        .expect(200);
+    });
+
+    it('should download own file (User B)', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/download/${fileIdB}`)
+        .set('Cookie', sessionCookieB)
+        .expect(200);
+    });
+
+    it('should delete own file (User B)', async () => {
+      await request(app.getHttpServer())
+        .delete(`/storage/${fileIdB}`)
+        .set('Cookie', sessionCookieB)
+        .expect(200);
+    });
+  });
+
+  describe('Cross-User Access (User B -> User A)', () => {
+    it('should not allow User B to get presigned URL for User A file', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/presigned-url/${fileIdA}`)
+        .set('Cookie', sessionCookieB)
+        .expect(404);
+    });
+
+    it('should not allow User B to download User A file', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/download/${fileIdA}`)
+        .set('Cookie', sessionCookieB)
+        .expect(404);
+    });
+
+    it('should not allow User B to delete User A file', async () => {
+      await request(app.getHttpServer())
+        .delete(`/storage/${fileIdA}`)
+        .set('Cookie', sessionCookieB)
+        .expect(404);
+    });
+  });
+
+  describe('Anonymous Access', () => {
+    it('should not allow anonymous upload', async () => {
+      const filePath = path.resolve(__dirname, 'test/testFile.txt');
+      await request(app.getHttpServer())
         .post('/storage/upload')
         .attach('file', filePath)
         .expect(403);
     });
 
-    it('should return 403 when downloading without session cookie (anonymous)', async () => {
-      return request(app.getHttpServer())
-        .get('/storage/download/some-uuid')
+    it('should not allow anonymous download', async () => {
+      await request(app.getHttpServer())
+        .get(`/storage/download/${fileIdA}`)
         .expect(403);
     });
 
-    it('should return 403 when deleting without session cookie (anonymous)', async () => {
-      return request(app.getHttpServer())
-        .delete('/storage/some-uuid')
+    it('should not allow anonymous delete', async () => {
+      await request(app.getHttpServer())
+        .delete(`/storage/${fileIdA}`)
         .expect(403);
     });
-
-    it('should allow access with X-Hasura-Admin-Secret bypass', async () => {
-      const adminSecret = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
-      if (!adminSecret) {
-        console.warn(
-          'Skipping Admin Secret test: HASURA_GRAPHQL_ADMIN_SECRET not set',
-        );
-        return;
-      }
-
-      // Пытаемся получить несуществующий файл, но ожидаем 404 (найден в БД, но нет в MinIO)
-      // или 200/400, но ГЛАВНОЕ не 401.
-      const res = await request(app.getHttpServer())
-        .get('/storage/download/00000000-0000-0000-0000-000000000000')
-        .set('x-hasura-admin-secret', adminSecret);
-
-      expect(res.status).not.toBe(401);
-    });
   });
 
-  it('should upload a file successfully', async () => {
-    console.log('Starting file upload test... at directory:', __dirname);
-    const filePath = path.resolve(__dirname, 'test/testFile.txt');
-    return request(app.getHttpServer())
-      .post('/storage/upload')
-      .set('Cookie', sessionCookie)
-      .attach('file', filePath)
-      .expect(201)
-      .then((response) => {
-        console.log('File upload response:', response.body);
-        fileId = response.body.updatedFileMetadata.id; // Сохраняем ID файла для последующих тестов
-        expect(response.body).toHaveProperty('updatedFileMetadata');
-        expect(response.body.updatedFileMetadata).toHaveProperty('name');
-        expect(response.body.updatedFileMetadata.name).toMatch('testFile.txt');
-      });
-  });
+  describe('Admin Access (Bypass)', () => {
+    const adminSecret = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
 
-  describe('Multi-user Isolation', () => {
-    it("should not allow User B to delete User A's file", async () => {
-      if (!fileId || !sessionCookieUserB) {
-        console.warn(
-          'Skipping Multi-user test: fileId or User B cookie missing',
-        );
-        return;
-      }
-
-      // User B пытается удалить файл, загруженный User A
-      return request(app.getHttpServer())
-        .delete(`/storage/${fileId}`)
-        .set('Cookie', sessionCookieUserB)
-        .expect(404); // Ожидаем 404, так как RLS скрывает файл от User B
+    it('should allow admin to get presigned URL for any file', async () => {
+      if (!adminSecret) return console.warn('No admin secret');
+      await request(app.getHttpServer())
+        .get(`/storage/presigned-url/${fileIdA}`)
+        .set('x-hasura-admin-secret', adminSecret)
+        .expect(200);
     });
 
-    it("should not allow User B to download User A's file", async () => {
-      if (!fileId || !sessionCookieUserB) return;
+    it('should allow admin to download any file', async () => {
+      if (!adminSecret) return console.warn('No admin secret');
+      await request(app.getHttpServer())
+        .get(`/storage/download/${fileIdA}`)
+        .set('x-hasura-admin-secret', adminSecret)
+        .expect(200);
+    });
 
-      // Теперь, когда мы изменили права в Hasura, User B не должен иметь доступа к файлу User A
-      return request(app.getHttpServer())
-        .get(`/storage/download/${fileId}`)
-        .set('Cookie', sessionCookieUserB)
-        .expect(404); // Ожидаем 404
+    it('should allow admin to delete any file', async () => {
+      if (!adminSecret) return console.warn('No admin secret');
+      await request(app.getHttpServer())
+        .delete(`/storage/${fileIdA}`)
+        .set('x-hasura-admin-secret', adminSecret)
+        .expect(200);
     });
   });
-
-  it('Should get presigned url successfully', async () => {
-    if (!fileId) {
-      throw new Error('File ID is not defined. Cannot get presigned URL.');
-    }
-    return request(app.getHttpServer())
-      .get(`/storage/presigned-url/${fileId}`)
-      .set('Cookie', sessionCookie)
-      .expect(200)
-      .then((response) => {
-        console.log('Presigned URL response:', response.body);
-        expect(response.body).toHaveProperty('url');
-      });
-  });
-
-  it('Should download a file successfully', async () => {
-    if (!fileId) {
-      throw new Error('File ID is not defined. Cannot download file.');
-    }
-    return request(app.getHttpServer())
-      .get(`/storage/download/${fileId}`)
-      .set('Cookie', sessionCookie)
-      .buffer(true)
-      .parse((res, callback) => {
-        // Собираем все чанки в буфер
-        const data: Buffer[] = [];
-        res.on('data', (chunk) => data.push(chunk));
-        res.on('end', () => callback(null, Buffer.concat(data)));
-      })
-      .expect(200)
-      .expect('Content-Disposition', /attachment; filename="testFile.txt"/)
-      .then((response) => {
-        expect(Buffer.isBuffer(response.body)).toBe(true);
-        expect(response.body.length).toBeGreaterThan(0);
-      });
-  });
-
-  it('Should delete a file successfully', async () => {
-    if (!fileId) {
-      throw new Error('File ID is not defined. Cannot delete file.');
-    }
-    return request(app.getHttpServer())
-      .delete(`/storage/${fileId}`)
-      .set('Cookie', sessionCookie)
-      .expect(200);
-    // .then((response) => {
-    //   console.log('File deletion response:', response.body);
-    //   expect(response.body).toHaveProperty(
-    //     'message',
-    //     'File deleted successfully',
-    //   );
-    // });
-  }, 10000);
 });

@@ -220,10 +220,10 @@ export class FilesController {
     @Req() req: RequestWithHasuraUserId,
   ) {
     const userId = req.hasuraUserId;
-    const roles = req.hasuraRoles;
+    const roles = req.hasuraRoles || [];
 
-    if (!userId) {
-      // Запрещаем удаление анонимным пользователям
+    if (!userId && !roles.includes('admin')) {
+      // Запрещаем удаление анонимным пользователям (если это не админ)
       throw new ForbiddenException('Authentication required to delete files.');
     }
 

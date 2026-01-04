@@ -258,7 +258,7 @@ export class FilesService {
 
   async deleteFileMetadata(
     fileId: string,
-    userId: string,
+    userId?: string,
     roles?: string[],
   ): Promise<{ id: string }> {
     const mutation = gql`
