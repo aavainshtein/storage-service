@@ -81,11 +81,11 @@ services:
   # Новый сервис для нашего бэкенда
   storage:
     build:
-      context: ./backend # Путь к вашему NestJS проекту
-      dockerfile: Dockerfile # Имя файла Dockerfile внутри папки backend
+      context: ./storage # Путь к вашему NestJS проекту
+      dockerfile: Dockerfile # Имя файла Dockerfile внутри папки storage
     restart: always
     volumes:
-      - ./backend:/app # <-- ДОБАВЛЕНО/ИЗМЕНЕНО
+      - ./storage:/app # <-- ДОБАВЛЕНО/ИЗМЕНЕНО
       # - /app/node_modules # <-- ДОБАВЛЕНО: Важно для Node.js проектов!
     # command: npm run start:dev # <-- Может потребоваться изменить команду запуска
     command: npm run start:debug # <-- Это позволит NestJS перезагружаться при изменениях
@@ -119,8 +119,8 @@ services:
   #     - "5050:80"
   #   volumes:
   #     # need to chown -R 5050:5050 _volumes/pgadmin
-  #     - ./backend/pgadmin/_volumes/pgadmin:/var/lib/pgadmin
-  #     - ./backend/pgadmin/servers.json:/pgadmin4/servers.json:ro
+  #     - ./storage/pgadmin/_volumes/pgadmin:/var/lib/pgadmin
+  #     - ./storage/pgadmin/servers.json:/pgadmin4/servers.json:ro
   #   environment:
   #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
   #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}

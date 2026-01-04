@@ -45,7 +45,7 @@ services:
   # ... ваши существующие сервисы (postgres, hasura, auth) ...
 
   storage:
-    image: aavainshtein/storage-service-backend:latest # Или соберите локально
+    image: aavainshtein/storage-service:latest # Или соберите локально
     restart: always
     environment:
       PORT: 3001
@@ -54,9 +54,8 @@ services:
       HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET}
 
       # Связь с Auth (для проверки сессий)
-      # Backend будет дергать http://auth:3000/hasura
+      # Сервис будет дергать http://auth:3000/hasura
       BETTER_AUTH_API_URL: http://auth:3000
-
       # Связь с MinIO / S3
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
