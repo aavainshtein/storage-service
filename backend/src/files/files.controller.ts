@@ -54,7 +54,6 @@ export class FilesController {
       );
     }
     this.defaultBucketName = bucketName;
-
   }
 
   @Post('upload')
