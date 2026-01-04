@@ -127,7 +127,7 @@ export class FilesService {
         ...(input.isUploaded !== undefined
           ? { is_uploaded: input.isUploaded }
           : { is_uploaded: false }), // По умолчанию false, если не указано
-        // uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный, оставляем null
+        uploaded_by_user_id: input.uploadedByUserId || null, // Если пользователь анонимный или админ, оставляем null
       },
     };
 

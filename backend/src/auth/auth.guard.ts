@@ -54,6 +54,19 @@ export class AuthGuard implements CanActivate {
     this.logger.log('auth guard canActivate called');
     const request = context.switchToHttp().getRequest<Request>();
 
+    // 0. Попытка аутентификации по Hasura Admin Secret (Service-to-Service)
+    const adminSecret = this.configService.get<string>(
+      'HASURA_GRAPHQL_ADMIN_SECRET',
+    );
+    const requestAdminSecret = request.headers['x-hasura-admin-secret'];
+
+    if (adminSecret && requestAdminSecret === adminSecret) {
+      request.hasuraUserId = undefined; // Для админа не передаем userId, чтобы Hasura работала в режиме bypass
+      request.hasuraRoles = ['admin'];
+      request.isAuthenticated = true;
+      return true;
+    }
+
     // 1. Попытка аутентификации по JWT (Bearer Token)
     const jwtToken = this.extractJwtFromHeader(request);
     if (jwtToken) {
