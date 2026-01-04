@@ -63,7 +63,6 @@ export class FilesController {
     @UploadedFile() file: Multer.File,
     @Req() req: RequestWithHasuraUserId,
   ) {
-    console.log('upload endpoint called');
     if (!file) {
       throw new BadRequestException('No file uploaded.');
     }
@@ -243,7 +242,6 @@ export class FilesController {
       // Теперь, когда мы знаем, что пользователь имеет доступ к метаданным,
       // Hasura также проверит разрешение на удаление при вызове deleteFileMetadata
 
-      console.log('going to delete file with metadata:', fileMetadata);
       const objectName = fileMetadata.id;
 
       try {
@@ -256,9 +254,6 @@ export class FilesController {
           objectName,
           fileMetadata.bucket.name,
         );
-
-        console.log('deleted minio file:', deletedMinioFile);
-        console.log('deleted file id:', deletedFileId);
       } catch (error) {
         this.logger.error(
           `Error during file deletion: ${error.message}`,
@@ -269,8 +264,6 @@ export class FilesController {
         }
         throw new InternalServerErrorException('Failed to delete file');
       }
-
-      console.log('deleted file metadata from Hasura and file from s3');
 
       res.status(200).json({
         message: 'File deleted successfully',

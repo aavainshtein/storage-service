@@ -377,4 +377,24 @@ export class FilesService {
     }
     return data.storage_buckets[0];
   }
+
+  async updateBucket(
+    bucketId: string,
+    input: {
+      max_upload_size?: number | null;
+      allowed_mime_types?: string[] | null;
+    },
+  ): Promise<any> {
+    const mutation = gql`
+      mutation UpdateBucket($id: uuid!, $set: storage_buckets_set_input!) {
+        update_storage_buckets_by_pk(pk_columns: { id: $id }, _set: $set) {
+          id
+          max_upload_size
+          allowed_mime_types
+        }
+      }
+    `;
+    const variables = { id: bucketId, set: input };
+    return await this.executeGraphQLRequest(mutation, variables);
+  }
 }

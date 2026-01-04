@@ -141,7 +141,6 @@ export class AuthGuard implements CanActivate {
       // Используем node-fetch (или встроенный fetch в Node 18+)
       const fetch = (global as any).fetch || require('node-fetch');
 
-      console.log('going to auth with headers:', request.headers);
       const response = await fetch('http://localhost:3000/hasura', {
         method: 'GET',
         headers: request.headers,
@@ -160,13 +159,10 @@ export class AuthGuard implements CanActivate {
 
       const data = JSON.parse(bodyText);
 
-      console.log('Auth service response data:', data);
-
       // Ожидаем, что Auth возвращает userId и roles
       if (!data['X-Hasura-User-Id'] || !data['X-Hasura-Role']) {
         throw new UnauthorizedException('Invalid response from Auth service');
       }
-      console.log('Auth service response:', data);
       return {
         userId: data['X-Hasura-User-Id'],
         roles: [data['X-Hasura-Role']],
