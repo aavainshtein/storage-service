@@ -37,7 +37,9 @@ select_permissions:
         - bucket_id
         - id
         - uploaded_by_user_id
-      filter: {}
+      filter:
+        uploaded_by_user_id:
+          _eq: X-Hasura-User-Id
       allow_aggregations: true
     comment: ""
 update_permissions:

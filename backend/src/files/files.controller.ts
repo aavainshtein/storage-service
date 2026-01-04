@@ -17,6 +17,7 @@ import {
   Query,
   UseGuards,
   Req,
+  HttpException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -159,10 +160,7 @@ export class FilesController {
         `Error during file upload: ${error.message}`,
         error.stack,
       );
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to upload file');
@@ -208,7 +206,7 @@ export class FilesController {
         `Error during file download: ${error.message}`,
         error.stack,
       );
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to download file');
@@ -283,7 +281,7 @@ export class FilesController {
         `Error during file deletion: ${error.message}`,
         error.stack,
       );
-      if (error instanceof NotFoundException) {
+      if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to delete file');
@@ -341,10 +339,7 @@ export class FilesController {
         `Error generating presigned URL: ${error.message}`,
         error.stack,
       );
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
+      if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException(

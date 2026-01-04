@@ -19,6 +19,7 @@ describe('FilesController Integration tests', () => {
   let app: INestApplication;
   let fileId: string;
   let sessionCookie: string;
+  let sessionCookieUserB: string;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,24 +36,48 @@ describe('FilesController Integration tests', () => {
     await app.init();
 
     console.log('App initialized going to auth');
-    // Логиним тестового пользователя и сохраняем session token
-    const loginRes = await fetch(
-      'http://localhost:3000/api/auth/sign-in/email',
-      {
+
+    // Функция для обеспечения существования пользователя (регистрация + вход)
+    const ensureUser = async (email: string, name: string) => {
+      // Пытаемся зарегистрировать (на случай если его нет)
+      await fetch('http://localhost:3000/api/auth/sign-up/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'john.doe@example.com',
+          email,
           password: 'password1234',
-          rememberMe: true,
+          name,
         }),
-      },
-    );
+      });
 
-    // Получаем cookie из заголовка set-cookie
-    const setCookie = loginRes.headers.get('set-cookie');
-    // Обычно берём первую cookie, если их несколько
-    sessionCookie = setCookie?.split(';')[0] || ''; // 'better-auth.session_token=...'
+      // Входим
+      const loginRes = await fetch(
+        'http://localhost:3000/api/auth/sign-in/email',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password: 'password1234',
+            rememberMe: true,
+          }),
+        },
+      );
+
+      const setCookie = loginRes.headers.get('set-cookie');
+      return setCookie?.split(';')[0] || '';
+    };
+
+    // Логиним первого тестового пользователя (John Doe)
+    sessionCookie = await ensureUser('john.doe@example.com', 'John Doe');
+
+    // Логиним второго тестового пользователя (Jane Doe)
+    sessionCookieUserB = await ensureUser('jane.doe@example.com', 'Jane Doe');
+
+    console.log('Auth cookies obtained:', {
+      userA: !!sessionCookie,
+      userB: !!sessionCookieUserB,
+    });
   });
 
   afterAll(async () => {
@@ -64,6 +89,46 @@ describe('FilesController Integration tests', () => {
       .get('/storage/healthz')
       .set('Cookie', sessionCookie);
     expect([200, 404]).toContain(res.status);
+  });
+
+  describe('Security & RBAC', () => {
+    it('should return 403 when uploading without session cookie (anonymous)', async () => {
+      const filePath = path.resolve(__dirname, 'test/testFile.txt');
+      return request(app.getHttpServer())
+        .post('/storage/upload')
+        .attach('file', filePath)
+        .expect(403);
+    });
+
+    it('should return 403 when downloading without session cookie (anonymous)', async () => {
+      return request(app.getHttpServer())
+        .get('/storage/download/some-uuid')
+        .expect(403);
+    });
+
+    it('should return 403 when deleting without session cookie (anonymous)', async () => {
+      return request(app.getHttpServer())
+        .delete('/storage/some-uuid')
+        .expect(403);
+    });
+
+    it('should allow access with X-Hasura-Admin-Secret bypass', async () => {
+      const adminSecret = process.env.HASURA_GRAPHQL_ADMIN_SECRET;
+      if (!adminSecret) {
+        console.warn(
+          'Skipping Admin Secret test: HASURA_GRAPHQL_ADMIN_SECRET not set',
+        );
+        return;
+      }
+
+      // Пытаемся получить несуществующий файл, но ожидаем 404 (найден в БД, но нет в MinIO)
+      // или 200/400, но ГЛАВНОЕ не 401.
+      const res = await request(app.getHttpServer())
+        .get('/storage/download/00000000-0000-0000-0000-000000000000')
+        .set('x-hasura-admin-secret', adminSecret);
+
+      expect(res.status).not.toBe(401);
+    });
   });
 
   it('should upload a file successfully', async () => {
@@ -81,6 +146,33 @@ describe('FilesController Integration tests', () => {
         expect(response.body.updatedFileMetadata).toHaveProperty('name');
         expect(response.body.updatedFileMetadata.name).toMatch('testFile.txt');
       });
+  });
+
+  describe('Multi-user Isolation', () => {
+    it("should not allow User B to delete User A's file", async () => {
+      if (!fileId || !sessionCookieUserB) {
+        console.warn(
+          'Skipping Multi-user test: fileId or User B cookie missing',
+        );
+        return;
+      }
+
+      // User B пытается удалить файл, загруженный User A
+      return request(app.getHttpServer())
+        .delete(`/storage/${fileId}`)
+        .set('Cookie', sessionCookieUserB)
+        .expect(404); // Ожидаем 404, так как RLS скрывает файл от User B
+    });
+
+    it("should not allow User B to download User A's file", async () => {
+      if (!fileId || !sessionCookieUserB) return;
+
+      // Теперь, когда мы изменили права в Hasura, User B не должен иметь доступа к файлу User A
+      return request(app.getHttpServer())
+        .get(`/storage/download/${fileId}`)
+        .set('Cookie', sessionCookieUserB)
+        .expect(404); // Ожидаем 404
+    });
   });
 
   it('Should get presigned url successfully', async () => {

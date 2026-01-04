@@ -90,6 +90,11 @@ export class FilesService {
       // Если вы ожидаете, что Hasura будет отвечать ошибками доступа (даже с админским секретом,
       // если, например, нарушены правила валидации данных, которые имитируют разрешения),
       // вы можете добавить более детальную обработку.
+      if (error.message.includes('not found in type')) {
+        throw new ForbiddenException(
+          `Access denied or resource not found in Hasura: ${error.message}`,
+        );
+      }
       throw new InternalServerErrorException(
         `Hasura operation failed: ${error.message}`,
       );

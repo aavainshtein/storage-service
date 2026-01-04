@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
   Logger,
   InternalServerErrorException,
+  HttpException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -171,6 +172,9 @@ export class AuthGuard implements CanActivate {
         roles: [data['X-Hasura-Role']],
       };
     } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(`Error connecting to Auth service: ${error.message}`);
       throw new InternalServerErrorException('Auth service connection error');
     }
