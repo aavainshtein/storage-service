@@ -353,4 +353,36 @@ export class FilesController {
       );
     }
   }
+
+  @Get(':fileId/metadata')
+  async getFileMetadata(
+    @Param('fileId') fileId: string,
+    @Req() req: RequestWithHasuraUserId,
+  ) {
+    const userId = req.hasuraUserId;
+    const roles = req.hasuraRoles;
+
+    try {
+      const fileMetadata = await this.filesService.getFileMetadata(
+        fileId,
+        userId,
+        roles,
+      );
+      if (!fileMetadata) {
+        throw new NotFoundException(
+          `File with ID ${fileId} not found or not accessible.`,
+        );
+      }
+      return fileMetadata;
+    } catch (error) {
+      this.logger.error(
+        `Error fetching file metadata: ${error.message}`,
+        error.stack,
+      );
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to fetch file metadata');
+    }
+  }
 }

@@ -39,7 +39,7 @@ export class FilesService {
   }
 
   // Вспомогательный метод для добавления пользовательских заголовков к запросу
-  // Это позволит Hasura "знать", кто инициировал запрос, даже если он пришел с админским секретом
+
   private async executeGraphQLRequest(
     query: string,
     variables: Record<string, any>,
@@ -51,14 +51,20 @@ export class FilesService {
     if (userId) {
       requestHeaders['X-Hasura-User-Id'] = userId;
     }
+
+    // Если роль явно передана и это не 'admin', устанавливаем её.
+    // Если роль 'admin', мы НЕ отправляем X-Hasura-Role, чтобы Hasura работала в режиме bypass (админ по умолчанию).
+    // Если ролей нет и нет userId, мы также ничего не отправляем, полагаясь на Admin-Secret.
     if (roles && roles.length > 0) {
-      requestHeaders['X-Hasura-Role'] = roles[0]; // Основная роль
-      console.log('requestHeaders:', requestHeaders);
-      // requestHeaders['X-Hasura-Allowed-Roles'] = roles.join(','); // Все разрешенные роли
-    } else {
-      // Если пользователь не аутентифицирован (аноним), явно указываем роль 'anonymous'
+      if (roles[0] !== 'admin') {
+        requestHeaders['X-Hasura-Role'] = roles[0];
+      }
+    } else if (
+      !userId &&
+      !this.configService.get('HASURA_GRAPHQL_ADMIN_SECRET')
+    ) {
+      // Только если мы НЕ сервис (нет админ-секрета) и нет ролей, ставим anonymous
       requestHeaders['X-Hasura-Role'] = 'anonymous';
-      // requestHeaders['X-Hasura-Allowed-Roles'] = 'user';
     }
 
     try {
